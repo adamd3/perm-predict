@@ -64,4 +64,10 @@ async def predict_batch(request: Request, file: UploadFile):
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "model_loaded": bool(session), "timestamp": datetime.datetime.now().isoformat()}
+    return {
+        "status": "healthy",
+        "model_loaded": bool(session),
+        "model_version": "1.0.0",  # Add version tracking
+        "model_loaded_at": getattr(session, "_loaded_at", datetime.datetime.now()).isoformat(),
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
