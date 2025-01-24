@@ -30,7 +30,8 @@ async def process_batch(smiles_batch: List[str], session) -> List[PredictionResp
             features_list.append(features)
             valid_smiles.append(smiles)
         except ValueError as e:
-            results.append(PredictionResponse(smiles=smiles, prediction=0.0, probability=0.0, error=str(e)))
+            error_msg = f"Invalid SMILES structure: {str(e)}. Please check for correct syntax and valid atoms."
+            results.append(PredictionResponse(smiles=smiles, prediction=0.0, probability=0.0, error=error_msg))
 
     if features_list:
         features_array = np.vstack(features_list)
