@@ -1,2 +1,4 @@
 [tool.pytest]
 pythonpath = "."
+testpaths = ["tests"]
+python_files = ["test_*.py"]
