@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, Request
-from fastapi.middleware.base import BaseHTTPMiddleware
-
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from typing import Optional
 from slowapi import Limiter
