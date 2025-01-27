@@ -28,8 +28,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
+        # Install all production dependencies first
+        pip install --no-cache-dir -r requirements.txt
+        # Install test dependencies
+        pip install --no-cache-dir pytest pytest-cov pytest-asyncio httpx
         
     - name: Run tests
       run: |
