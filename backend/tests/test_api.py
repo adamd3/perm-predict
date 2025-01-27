@@ -8,7 +8,8 @@ from app.utils.processing import smiles_to_features
 # Mock the ONNX session before importing app
 mock_session = MagicMock()
 mock_session.get_inputs.return_value = [MagicMock(name="float_input")]
-mock_session.run.return_value = [np.array([[0.3, 0.7]])]
+# Return predictions for multiple inputs
+mock_session.run.return_value = [np.array([[0.3, 0.7], [0.3, 0.7]])]
 
 with patch("onnxruntime.InferenceSession", return_value=mock_session):
     from app.main import app
@@ -46,7 +47,6 @@ def test_predict_single_valid():
     assert "prediction" in data
     assert "probability" in data
     assert data["smiles"] == VALID_SMILES
-    # Test the probability is between 0 and 1
     assert 0 <= data["probability"] <= 1
 
 
@@ -57,20 +57,27 @@ def test_predict_single_invalid():
     assert data["error"] is not None
 
 
-@pytest.mark.asyncio
-async def test_predict_batch():
-    csv_content = "smiles\n" + VALID_SMILES + "\n" + VALID_SMILES
-    response = client.post("/predict/batch", files={"file": ("test.csv", csv_content.encode(), "text/csv")})
+def test_predict_batch():
+    csv_content = f"smiles\n{VALID_SMILES}\n{VALID_SMILES}"
+    files = {"file": ("test.csv", csv_content.encode(), "text/csv")}
+
+    # Print request details for debugging
+    print(f"\nTest CSV Content:\n{csv_content}")
+
+    response = client.post("/predict/batch", files=files)
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
+
+    # Print response for debugging
+    print(f"\nResponse data:\n{data}")
+
+    assert len(data) == 2, f"Expected 2 predictions, got {len(data)}"
     assert all("prediction" in item for item in data)
     assert all("probability" in item for item in data)
     assert all(0 <= item["probability"] <= 1 for item in data)
 
 
-@pytest.mark.asyncio
-async def test_predict_batch_invalid_file():
+def test_predict_batch_invalid_file():
     response = client.post("/predict/batch", files={"file": ("test.txt", b"not a csv", "text/plain")})
     assert response.status_code == 400
     assert "Only CSV files are supported" in response.json()["detail"]
