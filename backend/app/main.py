@@ -1,10 +1,16 @@
 from fastapi import FastAPI, HTTPException, UploadFile, Request
+from fastapi.middleware.base import BaseHTTPMiddleware
+
 from fastapi.responses import JSONResponse
-import pandas as pd
+
 from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
+import time
+import logging
+import pandas as pd
 import datetime
 import onnxruntime as ort
 
@@ -14,9 +20,23 @@ from app.utils.logger import setup_logging
 from app.config import settings
 from app.models import SMILESInput, PredictionResponse
 
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        logging.info(
+            f"Method: {request.method} Path: {request.url.path} "
+            f"Status: {response.status_code} Duration: {process_time:.3f}s"
+        )
+        return response
+
+
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
+app.add_middleware(RequestLoggingMiddleware)
 
 # Load ONNX model
 model_path = settings.MODEL_PATH
