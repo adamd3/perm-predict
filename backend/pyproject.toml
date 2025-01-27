@@ -1,12 +1,8 @@
-[
-tool.pytest
-]
+[tool.pytest]
 pythonpath = "."
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
-[
-tool.pytest.ini_options
-]
+[tool.pytest.ini_options.]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
