@@ -8,7 +8,10 @@ def setup_logging(log_dir: str = "logs"):
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.FileHandler(f"{log_dir}/app.log"), logging.StreamHandler()],
+        handlers=[
+            logging.handlers.RotatingFileHandler(f"{log_dir}/app.log", maxBytes=1024 * 1024, backupCount=3),  # 1MB
+            logging.StreamHandler(),
+        ],
     )
 
     return logging.getLogger(__name__)
