@@ -8,14 +8,15 @@ from app.config import settings
 
 def smiles_to_features(smiles: str) -> np.ndarray:
     """Convert SMILES to Morgan fingerprint features."""
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            raise ValueError("Invalid SMILES string")
-        fp = AllChem.GetMorganFingerprintAsBitVect(mol, settings.FINGERPRINT_RADIUS, settings.FEATURE_COUNT)
-        return np.array(fp, dtype=np.float32)
-    except Exception as e:
-        raise ValueError(f"Error processing SMILES: {str(e)}")
+    mol = Chem.MolFromSmiles(smiles)
+    return (
+        np.array(
+            AllChem.GetMorganFingerprintAsBitVect(mol, settings.FINGERPRINT_RADIUS, settings.FEATURE_COUNT),
+            dtype=np.int8,
+        )
+        if mol
+        else np.zeros((settings.FEATURE_COUNT,), dtype=np.int8)
+    )
 
 
 async def process_batch(smiles_batch: List[str], session) -> List[PredictionResponse]:
