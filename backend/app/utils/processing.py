@@ -9,13 +9,11 @@ from app.config import settings
 def smiles_to_features(smiles: str) -> np.ndarray:
     """Convert SMILES to Morgan fingerprint features."""
     mol = Chem.MolFromSmiles(smiles)
-    return (
-        np.array(
-            AllChem.GetMorganFingerprintAsBitVect(mol, settings.FINGERPRINT_RADIUS, settings.FEATURE_COUNT),
-            dtype=np.int8,
-        )
-        if mol
-        else np.zeros((settings.FEATURE_COUNT,), dtype=np.int8)
+    if mol is None:
+        raise ValueError(f"Invalid SMILES string: {smiles}")
+
+    return np.array(
+        AllChem.GetMorganFingerprintAsBitVect(mol, settings.FINGERPRINT_RADIUS, settings.FEATURE_COUNT), dtype=np.int8
     )
 
 
