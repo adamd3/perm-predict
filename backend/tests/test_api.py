@@ -31,8 +31,8 @@ def test_health_check():
 def test_smiles_to_features_valid():
     features = smiles_to_features(VALID_SMILES)
     assert isinstance(features, np.ndarray)
-    assert features.dtype == np.float32
-    assert features.shape == (4200,)  # Based on your FEATURE_COUNT
+    assert features.dtype == np.int8
+    assert features.shape == (4200,)
 
 
 def test_smiles_to_features_invalid():
