@@ -25,6 +25,7 @@ async def process_batch(smiles_batch: List[str], session) -> List[PredictionResp
 
     for smiles in smiles_batch:
         try:
+            # Get features as int8 for memory efficiency
             features = smiles_to_features(smiles)
             features_list.append(features)
             valid_smiles.append(smiles)
@@ -33,7 +34,8 @@ async def process_batch(smiles_batch: List[str], session) -> List[PredictionResp
             results.append(PredictionResponse(smiles=smiles, prediction=0.0, probability=0.0, error=error_msg))
 
     if features_list:
-        features_array = np.vstack(features_list)
+        # Stack the features and convert to float32 just before prediction
+        features_array = np.vstack(features_list).astype(np.float32)
         input_name = session.get_inputs()[0].name
         predictions = session.run(None, {input_name: features_array})[0]
 
