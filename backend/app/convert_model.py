@@ -12,7 +12,7 @@ def convert_to_onnx(xgboost_model_path: str, onnx_model_path: str, feature_count
     if original_feature_names is not None:
         booster.feature_names = [f"f{i}" for i in range(len(original_feature_names))]
 
-    initial_type = [("float_input", FloatTensorType([None, feature_count]))]
+    initial_type = [("fingerprint_input", FloatTensorType([None, feature_count]))]
     onnx_model = convert_xgboost(booster, initial_types=initial_type, target_opset=15)
 
     with open(onnx_model_path, "wb") as f:
