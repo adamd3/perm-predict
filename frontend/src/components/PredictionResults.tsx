@@ -8,16 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-interface PredictionResult {
-  smiles: string;
-  prediction: number;
-  probability: number;
-  error?: string;
-}
-
-interface PredictionResultsProps {
-  results: PredictionResult[];
-}
+import type { PredictionResultsProps } from '@/lib/types'
 
 const PredictionResults = ({ results }: PredictionResultsProps) => {
   if (!results.length) return null;

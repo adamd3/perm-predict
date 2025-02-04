@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PredictionResults from './PredictionResults';
 
+import type { PredictionResult, SinglePredictionRequest } from '@/lib/types'
+
 const PredictionForm = () => {
   const [smilesInput, setSmilesInput] = useState('');
-  const [file, setFile] = useState(null);
-  const [results, setResults] = useState([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +27,7 @@ const PredictionForm = () => {
         body: JSON.stringify({ smiles: smilesInput })
       });
 
-      const data = await response.json();
+      const data = await response.json() as PredictionResult;
       if (data.error) {
         setError(data.error);
       } else {
@@ -57,7 +59,7 @@ const PredictionForm = () => {
         body: formData
       });
 
-      const data = await response.json();
+      const data = await response.json() as PredictionResult[];
       if (response.ok) {
         setResults(data);
       } else {
