@@ -3,12 +3,11 @@ from typing import List, Dict, Any
 import logging
 import pickle
 import numpy as np
-from rdkit import Chem
-from rdkit.Chem import AllChem, Descriptors
 import os
 
 from app.config import settings
 from app.utils.logger import setup_logging
+from app.utils.processing import smiles_to_comprehensive_features, combine_features
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -44,41 +43,6 @@ def load_models():
         logger.error(f"Failed to load models: {e}")
         raise
 
-def smiles_to_features(smiles: str) -> Dict[str, Any]:
-    """Convert SMILES to comprehensive molecular features."""
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        raise ValueError(f"Invalid SMILES string: {smiles}")
-    
-    # Morgan fingerprints
-    morgan_fp = np.array(
-        AllChem.GetMorganFingerprintAsBitVect(mol, settings.FINGERPRINT_RADIUS, settings.FEATURE_COUNT)
-    )
-    
-    # Molecular descriptors
-    descriptors = {
-        'MolWt': Descriptors.MolWt(mol),
-        'LogP': Descriptors.MolLogP(mol),
-        'TPSA': Descriptors.TPSA(mol),
-        'NumHDonors': Descriptors.NumHDonors(mol),
-        'NumHAcceptors': Descriptors.NumHAcceptors(mol),
-        'NumRotatableBonds': Descriptors.NumRotatableBonds(mol),
-        'NumAromaticRings': Descriptors.NumAromaticRings(mol),
-    }
-    
-    return {
-        'morgan_fingerprint': morgan_fp.tolist(),
-        'descriptors': descriptors
-    }
-
-def combine_features(features: Dict[str, Any]) -> np.ndarray:
-    """Combine different feature types into a single feature vector."""
-    morgan_fp = np.array(features['morgan_fingerprint'])
-    descriptor_values = np.array(list(features['descriptors'].values()))
-    
-    # Combine features
-    combined = np.concatenate([morgan_fp, descriptor_values])
-    return combined.reshape(1, -1)
 
 @celery_app.task(bind=True, name="predict_permeability")
 def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
@@ -94,8 +58,8 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
         
         for smiles in smiles_list:
             try:
-                # Extract features
-                features = smiles_to_features(smiles)
+                # Extract features using processing.py logic
+                features = smiles_to_comprehensive_features(smiles)
                 feature_vector = combine_features(features)
                 
                 # Stage 1: Binary classification (near-zero vs non-zero accumulation)
