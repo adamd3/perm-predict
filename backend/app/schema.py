@@ -14,27 +14,27 @@ from app.models import (
     PredictionJobInput as PredictionJobInputModel
 )
 
-@pydantic.type(model=MolecularDescriptorsModel)
+@pydantic.type(model=MolecularDescriptorsModel, all_fields=True)
 class MolecularDescriptors:
     pass
 
-@pydantic.type(model=PredictionFeaturesModel)
+@pydantic.type(model=PredictionFeaturesModel, all_fields=True)
 class PredictionFeatures:
     pass
 
-@pydantic.type(model=PredictionResultModel)
+@pydantic.type(model=PredictionResultModel, all_fields=True)
 class PredictionResult:
     pass
 
-@pydantic.type(model=JobResultModel)
+@pydantic.type(model=JobResultModel, all_fields=True)
 class JobResult:
     pass
 
-@pydantic.type(model=JobStatusModel)
+@pydantic.type(model=JobStatusModel, all_fields=True)
 class JobStatus:
     pass
 
-@pydantic.input(model=PredictionJobInputModel)
+@pydantic.input(model=PredictionJobInputModel, all_fields=True)
 class PredictionJobInput:
     pass
 
