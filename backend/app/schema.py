@@ -1,64 +1,49 @@
 import strawberry
+from strawberry.experimental import pydantic
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
 from app.worker import celery_app
+from app.models import (
+    MolecularDescriptors as MolecularDescriptorsModel,
+    PredictionFeatures as PredictionFeaturesModel,
+    PredictionResult as PredictionResultModel,
+    JobResult as JobResultModel,
+    JobStatus as JobStatusModel,
+    PredictionJobInput as PredictionJobInputModel
+)
 
-@strawberry.type
+@pydantic.type(model=MolecularDescriptorsModel)
 class MolecularDescriptors:
-    mol_wt: float
-    log_p: float
-    tpsa: float
-    num_h_donors: int
-    num_h_acceptors: int
-    num_rotatable_bonds: int
-    num_aromatic_rings: int
+    pass
 
-@strawberry.type
+@pydantic.type(model=PredictionFeaturesModel)
 class PredictionFeatures:
-    morgan_fingerprint: List[int]
-    descriptors: MolecularDescriptors
+    pass
 
-@strawberry.type
+@pydantic.type(model=PredictionResultModel)
 class PredictionResult:
-    smiles: str
-    prediction: float
-    confidence: float
-    classifier_prediction: int
-    features: Optional[PredictionFeatures] = None
-    error: Optional[str] = None
+    pass
 
-@strawberry.type
+@pydantic.type(model=JobResultModel)
 class JobResult:
-    status: str
-    results: List[PredictionResult]
-    total_processed: int
-    successful: int
-    failed: int
-    job_id: str
-    created_at: str
-    completed_at: Optional[str] = None
+    pass
 
-@strawberry.type
+@pydantic.type(model=JobStatusModel)
 class JobStatus:
-    job_id: str
-    status: str
-    created_at: str
-    progress: Optional[str] = None
-    error: Optional[str] = None
+    pass
 
-@strawberry.input
+@pydantic.input(model=PredictionJobInputModel)
 class PredictionJobInput:
-    smiles_list: List[str]
-    job_name: Optional[str] = None
+    pass
 
-def convert_features_to_graphql(features_dict: Dict[str, Any]) -> Optional[PredictionFeatures]:
-    """Convert dictionary features to GraphQL type."""
+def convert_features_to_model(features_dict: Dict[str, Any]) -> Optional[PredictionFeaturesModel]:
+    """Convert dictionary features to Pydantic model."""
     if not features_dict:
         return None
     
-    descriptors = MolecularDescriptors(
+    descriptors = MolecularDescriptorsModel(
         mol_wt=features_dict['descriptors']['MolWt'],
         log_p=features_dict['descriptors']['LogP'],
         tpsa=features_dict['descriptors']['TPSA'],
@@ -68,7 +53,7 @@ def convert_features_to_graphql(features_dict: Dict[str, Any]) -> Optional[Predi
         num_aromatic_rings=features_dict['descriptors']['NumAromaticRings']
     )
     
-    return PredictionFeatures(
+    return PredictionFeaturesModel(
         morgan_fingerprint=features_dict['morgan_fingerprint'],
         descriptors=descriptors
     )
@@ -86,7 +71,7 @@ class Query:
                 return None
             
             if task.state == 'PENDING':
-                return JobStatus(
+                return JobStatusModel(
                     job_id=job_id,
                     status='pending',
                     created_at=datetime.now().isoformat(),
@@ -94,7 +79,7 @@ class Query:
                 )
             
             elif task.state == 'PROGRESS':
-                return JobStatus(
+                return JobStatusModel(
                     job_id=job_id,
                     status='processing',
                     created_at=datetime.now().isoformat(),
@@ -104,12 +89,12 @@ class Query:
             elif task.state == 'SUCCESS':
                 result = task.result
                 
-                # Convert results to GraphQL types
+                # Convert results to Pydantic models
                 prediction_results = []
                 for r in result.get('results', []):
-                    features = convert_features_to_graphql(r.get('features'))
+                    features = convert_features_to_model(r.get('features'))
                     prediction_results.append(
-                        PredictionResult(
+                        PredictionResultModel(
                             smiles=r['smiles'],
                             prediction=r['prediction'],
                             confidence=r['confidence'],
@@ -119,7 +104,7 @@ class Query:
                         )
                     )
                 
-                return JobResult(
+                return JobResultModel(
                     status='completed',
                     results=prediction_results,
                     total_processed=result.get('total_processed', 0),
@@ -131,7 +116,7 @@ class Query:
                 )
             
             else:  # FAILURE or other error states
-                return JobStatus(
+                return JobStatusModel(
                     job_id=job_id,
                     status='failed',
                     created_at=datetime.now().isoformat(),
@@ -139,7 +124,7 @@ class Query:
                 )
                 
         except Exception as e:
-            return JobStatus(
+            return JobStatusModel(
                 job_id=job_id,
                 status='error',
                 created_at=datetime.now().isoformat(),
@@ -164,7 +149,7 @@ class Query:
                 'REVOKED': 'cancelled'
             }
             
-            return JobStatus(
+            return JobStatusModel(
                 job_id=job_id,
                 status=status_map.get(task.state, 'unknown'),
                 created_at=datetime.now().isoformat(),
@@ -173,7 +158,7 @@ class Query:
             )
             
         except Exception as e:
-            return JobStatus(
+            return JobStatusModel(
                 job_id=job_id,
                 status='error',
                 created_at=datetime.now().isoformat(),
@@ -188,7 +173,7 @@ class Mutation:
         try:
             # Validate input
             if not job_input.smiles_list:
-                return JobStatus(
+                return JobStatusModel(
                     job_id="",
                     status='error',
                     created_at=datetime.now().isoformat(),
@@ -201,7 +186,7 @@ class Mutation:
                 args=[job_input.smiles_list]
             )
             
-            return JobStatus(
+            return JobStatusModel(
                 job_id=task.id,
                 status='submitted',
                 created_at=datetime.now().isoformat(),
@@ -209,7 +194,7 @@ class Mutation:
             )
             
         except Exception as e:
-            return JobStatus(
+            return JobStatusModel(
                 job_id="",
                 status='error',
                 created_at=datetime.now().isoformat(),
