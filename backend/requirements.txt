@@ -4,3 +4,10 @@ strawberry-graphql[fastapi]
 celery
 redis
 python-dotenv
+numpy
+rdkit
+scikit-learn
+joblib
+pydantic
+pydantic-settings
+pytest
