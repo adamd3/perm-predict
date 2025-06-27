@@ -62,7 +62,7 @@ def convert_features_to_model(features_dict: Dict[str, Any]) -> Optional[Predict
 class Query:
     @strawberry.field
     def get_prediction_result(self, job_id: str) -> Optional[JobResult]:
-        """Get the result of a prediction job by job ID."""
+        """Get the result of a prediction job by job ID. Only returns results for completed jobs."""
         try:
             # Get task result from Celery
             task = celery_app.AsyncResult(job_id)
@@ -70,23 +70,8 @@ class Query:
             if not task:
                 return None
             
-            if task.state == 'PENDING':
-                return JobStatusModel(
-                    job_id=job_id,
-                    status='pending',
-                    created_at=datetime.now().isoformat(),
-                    progress="Job is queued and waiting to be processed"
-                )
-            
-            elif task.state == 'PROGRESS':
-                return JobStatusModel(
-                    job_id=job_id,
-                    status='processing',
-                    created_at=datetime.now().isoformat(),
-                    progress="Job is currently being processed"
-                )
-            
-            elif task.state == 'SUCCESS':
+            # Only return JobResult for successfully completed tasks
+            if task.state == 'SUCCESS':
                 result = task.result
                 
                 # Convert results to Pydantic models
@@ -111,25 +96,18 @@ class Query:
                     successful=result.get('successful', 0),
                     failed=result.get('failed', 0),
                     job_id=job_id,
-                    created_at=datetime.now().isoformat(),
-                    completed_at=datetime.now().isoformat()
+                    created_at=result.get('created_at', datetime.now().isoformat()),
+                    completed_at=result.get('completed_at', datetime.now().isoformat())
                 )
             
-            else:  # FAILURE or other error states
-                return JobStatusModel(
-                    job_id=job_id,
-                    status='failed',
-                    created_at=datetime.now().isoformat(),
-                    error=str(task.info) if task.info else "Unknown error occurred"
-                )
+            # For any other state (PENDING, PROGRESS, FAILURE), return None
+            # Clients should use get_job_status to check status
+            return None
                 
         except Exception as e:
-            return JobStatusModel(
-                job_id=job_id,
-                status='error',
-                created_at=datetime.now().isoformat(),
-                error=f"Failed to retrieve job result: {str(e)}"
-            )
+            # Log the error but return None to maintain consistent return type
+            logger.error(f"Failed to retrieve job result for {job_id}: {str(e)}")
+            return None
     
     @strawberry.field
     def get_job_status(self, job_id: str) -> Optional[JobStatus]:
@@ -140,6 +118,13 @@ class Query:
             if not task:
                 return None
             
+            # Retrieve job metadata from Redis
+            try:
+                metadata = celery_app.backend.get(f"job_metadata:{job_id}")
+                created_at = metadata.get('created_at') if metadata else datetime.now().isoformat()
+            except:
+                created_at = datetime.now().isoformat()
+            
             status_map = {
                 'PENDING': 'pending',
                 'PROGRESS': 'processing',
@@ -149,11 +134,23 @@ class Query:
                 'REVOKED': 'cancelled'
             }
             
+            # Generate appropriate progress message
+            if task.state == 'PENDING':
+                progress = "Job is queued and waiting to be processed"
+            elif task.state == 'PROGRESS':
+                progress = "Job is currently being processed"
+            elif task.state == 'SUCCESS':
+                progress = "Job completed successfully"
+            elif task.state == 'FAILURE':
+                progress = "Job failed during processing"
+            else:
+                progress = f"Task state: {task.state}"
+            
             return JobStatusModel(
                 job_id=job_id,
                 status=status_map.get(task.state, 'unknown'),
-                created_at=datetime.now().isoformat(),
-                progress=f"Task state: {task.state}",
+                created_at=created_at,
+                progress=progress,
                 error=str(task.info) if task.state == 'FAILURE' and task.info else None
             )
             
@@ -180,16 +177,33 @@ class Mutation:
                     error="SMILES list cannot be empty"
                 )
             
-            # Submit job to Celery
+            # Capture creation timestamp
+            created_at = datetime.now().isoformat()
+            
+            # Submit job to Celery with metadata
             task = celery_app.send_task(
                 'predict_permeability',
-                args=[job_input.smiles_list]
+                args=[job_input.smiles_list],
+                kwargs={
+                    'created_at': created_at,
+                    'job_name': job_input.job_name
+                }
+            )
+            
+            # Store job metadata in Redis for timestamp tracking
+            celery_app.backend.set(
+                f"job_metadata:{task.id}",
+                {
+                    'created_at': created_at,
+                    'job_name': job_input.job_name,
+                    'smiles_count': len(job_input.smiles_list)
+                }
             )
             
             return JobStatusModel(
                 job_id=task.id,
                 status='submitted',
-                created_at=datetime.now().isoformat(),
+                created_at=created_at,
                 progress=f"Job submitted with {len(job_input.smiles_list)} compounds"
             )
             
