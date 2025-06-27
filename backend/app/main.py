@@ -1,23 +1,13 @@
-from fastapi import FastAPI, HTTPException, UploadFile, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
-
-from typing import Optional
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+from strawberry.fastapi import GraphQLRouter
 
 import time
 import logging
-import pandas as pd
 import datetime
-import onnxruntime as ort
 
-from app.utils.validation import validate_model
-from app.utils.processing import process_batch
 from app.utils.logger import setup_logging
-from app.config import settings
-from app.models import SMILESInput, PredictionResponse
+from app.schema import schema
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -32,61 +22,31 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
-app.state.limiter = limiter
+# Initialize logging
+setup_logging()
+
+# Create FastAPI app
+app = FastAPI(
+    title="Perm-Predict GraphQL API",
+    description="Machine learning-based prediction of chemical accumulation in bacteria",
+    version="2.0.0"
+)
+
+# Add middleware
 app.add_middleware(RequestLoggingMiddleware)
 
-# Load ONNX model
-model_path = settings.MODEL_PATH
-session = ort.InferenceSession(model_path)
+# Create GraphQL router
+graphql_app = GraphQLRouter(schema)
 
-
-@app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request, exc):
-    return JSONResponse({"error": "Rate limit exceeded"}, status_code=429)
-
-
-@app.on_event("startup")
-async def startup_event():
-    global session
-    session = await validate_model()
-
-
-@app.post("/predict/single", response_model=PredictionResponse)
-@limiter.limit("100/minute")
-async def predict_single(request: Request, input_data: SMILESInput):
-    results = await process_batch([input_data.smiles], session)
-    return results[0]
-
-
-@app.post("/predict/batch")
-@limiter.limit("20/minute")
-async def predict_batch(request: Request, file: UploadFile):
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported")
-    try:
-        df = pd.read_csv(file.file)
-        if "smiles" not in df.columns:
-            raise HTTPException(status_code=400, detail="CSV must contain 'smiles' column")
-
-        results = []
-        for i in range(0, len(df), settings.BATCH_SIZE):
-            batch = df["smiles"][i : i + settings.BATCH_SIZE].tolist()
-            batch_results = await process_batch(batch, session)
-            results.extend(batch_results)
-        return results
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+# Include GraphQL router
+app.include_router(graphql_app, prefix="/graphql")
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "model_loaded": bool(session),
-        "model_version": "1.0.0",  # Add version tracking
-        "model_loaded_at": getattr(session, "_loaded_at", datetime.datetime.now()).isoformat(),
+        "service": "perm-predict-api",
+        "version": "2.0.0",
         "timestamp": datetime.datetime.now().isoformat(),
     }
