@@ -23,3 +23,5 @@ EOL
 # OS
 .DS_Store
 Thumbs.db
+
+get_tree.sh
