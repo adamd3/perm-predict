@@ -3,6 +3,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 from app.config import settings
+from app.models import PredictionResponse
 
 
 def smiles_to_features(smiles: str) -> np.ndarray:
