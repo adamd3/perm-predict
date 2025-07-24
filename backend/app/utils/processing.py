@@ -55,30 +55,46 @@ def combine_features(features: Dict[str, Any]) -> np.ndarray:
     return combined.reshape(1, -1)
 
 
-async def process_batch(smiles_batch: List[str], session) -> List[PredictionResponse]:
-    """Process a batch of SMILES strings."""
-    results = []
-    features_list = []
-    valid_smiles = []
+def validate_feature_dimensions(features: Dict[str, Any]) -> bool:
+    """Validate that extracted features match expected dimensions."""
+    try:
+        # Check Morgan fingerprint dimensions
+        if len(features['morgan_fingerprint']) != settings.FEATURE_COUNT:
+            return False
+        
+        # Check descriptor keys
+        expected_descriptors = {
+            'MolWt', 'LogP', 'TPSA', 'NumHDonors', 
+            'NumHAcceptors', 'NumRotatableBonds', 'NumAromaticRings'
+        }
+        if not expected_descriptors.issubset(features['descriptors'].keys()):
+            return False
+            
+        return True
+    except (KeyError, TypeError):
+        return False
 
-    for smiles in smiles_batch:
-        try:
-            # Get features as int8 for memory efficiency
-            features = smiles_to_features(smiles)
-            features_list.append(features)
-            valid_smiles.append(smiles)
-        except ValueError as e:
-            error_msg = f"Invalid SMILES structure: {str(e)}. Please check for correct syntax and valid atoms."
-            results.append(PredictionResponse(smiles=smiles, prediction=0.0, probability=0.0, error=error_msg))
 
-    if features_list:
-        # Stack the features and convert to float32 just before prediction
-        features_array = np.vstack(features_list).astype(np.float32)
-        input_name = session.get_inputs()[0].name
-        predictions = session.run(None, {input_name: features_array})[0]
-
-        for smiles, pred in zip(valid_smiles, predictions):
-            prob = float(pred[1])
-            results.append(PredictionResponse(smiles=smiles, prediction=1 if prob >= 0.5 else 0, probability=prob))
-
-    return results
+def normalize_features(feature_vector: np.ndarray) -> np.ndarray:
+    """Apply z-score normalization to continuous features, leave binary fingerprints unchanged."""
+    # First 4200 features are Morgan fingerprints (binary, leave unchanged)
+    fingerprint_features = feature_vector[:, :settings.FEATURE_COUNT]
+    
+    # Remaining features are continuous descriptors (apply z-score normalization)
+    if feature_vector.shape[1] > settings.FEATURE_COUNT:
+        descriptor_features = feature_vector[:, settings.FEATURE_COUNT:]
+        
+        # Simple z-score normalization (mean=0, std=1)
+        descriptor_mean = np.mean(descriptor_features, axis=0)
+        descriptor_std = np.std(descriptor_features, axis=0)
+        descriptor_std = np.where(descriptor_std == 0, 1, descriptor_std)  # Avoid division by zero
+        
+        normalized_descriptors = (descriptor_features - descriptor_mean) / descriptor_std
+        
+        # Combine normalized descriptors with unchanged fingerprints
+        normalized_features = np.concatenate([fingerprint_features, normalized_descriptors], axis=1)
+    else:
+        # Only fingerprint features
+        normalized_features = fingerprint_features
+    
+    return normalized_features

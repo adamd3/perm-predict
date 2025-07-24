@@ -9,7 +9,13 @@ class Settings(BaseSettings):
     
     # ML Model Paths
     MODEL_CLASSIFIER_PATH: str = "app/ml_models/classifier_model.pkl"
-    MODEL_REGRESSOR_PATH: str = "app/ml_models/regressor_model.pkl"
+    
+    # Regression/Ensemble Model Paths (commented out for classification-only mode)
+    # MODEL_REGRESSOR_PATH: str = "app/ml_models/regressor_model.pkl"  # Legacy - kept for compatibility
+    # MODEL_XGBOOST_REGRESSOR_PATH: str = "app/ml_models/xgboost_regressor.pkl"
+    # MODEL_ATTENTIVEFP_PATH: str = "app/ml_models/attentivefp_regressor.pt"
+    # MODEL_DIMENET_PATH: str = "app/ml_models/dimenet_regressor.pt"
+    # MODEL_BLENDER_PATH: str = "app/ml_models/blender_model.pkl"
     
     # Feature Extraction Settings
     FEATURE_COUNT: int = 4200

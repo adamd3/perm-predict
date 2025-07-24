@@ -22,7 +22,10 @@ class PredictionResult(BaseModel):
     smiles: str = Field(..., description="Input SMILES string")
     prediction: float = Field(..., description="Predicted permeability value")
     confidence: float = Field(..., description="Model confidence score")
+    uncertainty: Optional[float] = Field(None, description="Prediction uncertainty from ensemble variance")
+    ensemble_std: Optional[float] = Field(None, description="Standard deviation of ensemble predictions")
     classifier_prediction: int = Field(..., description="Binary classifier prediction (0 or 1)")
+    ensemble_predictions: Optional[List[float]] = Field(None, description="Individual ensemble model predictions")
     features: Optional[PredictionFeatures] = Field(None, description="Extracted molecular features")
     error: Optional[str] = Field(None, description="Error message if prediction failed")
 

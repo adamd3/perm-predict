@@ -1,128 +1,265 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useMutation, useLazyQuery } from '@apollo/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import PredictionResults from './PredictionResults';
+import { SUBMIT_PREDICTION_JOB, SUBMIT_BATCH_PREDICTION_JOB, GET_PREDICTION_RESULT } from '@/lib/graphql/queries';
 
-import type { PredictionResult, SinglePredictionRequest } from '@/lib/types'
+import type { PredictionResult, JobResponse, JobResult } from '@/lib/types'
 
-const PredictionForm = () => {
-  const [smilesInput, setSmilesInput] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+interface PredictionFormProps {
+  initialSmiles?: string;
+}
+
+const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
+  const [smilesInput, setSmilesInput] = useState(initialSmiles);
+  const [batchInput, setBatchInput] = useState('');
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [progress, setProgress] = useState(0);
 
-  const handleSinglePrediction = async (e) => {
+  // GraphQL hooks
+  const [submitPredictionJob] = useMutation(SUBMIT_PREDICTION_JOB);
+  const [submitBatchPredictionJob] = useMutation(SUBMIT_BATCH_PREDICTION_JOB);
+  const [getPredictionResult, { data: jobResult, stopPolling }] = useLazyQuery(GET_PREDICTION_RESULT, {
+    pollInterval: 2000,
+    errorPolicy: 'all',
+  });
+
+  // Effect to handle job polling results
+  useEffect(() => {
+    if (jobResult?.getPredictionResult) {
+      const result = jobResult.getPredictionResult as JobResult;
+      setJobStatus(result.status);
+      
+      if (result.status === 'processing') {
+        setProgress(prev => Math.min(prev + 10, 90)); // Simulate progress
+      } else if (result.status === 'completed') {
+        setProgress(100);
+        stopPolling();
+        
+        if (result.result) {
+          if (Array.isArray(result.result)) {
+            setResults(result.result);
+          } else {
+            setResults([result.result]);
+          }
+        }
+        
+        // Reset after a delay
+        setTimeout(() => {
+          setJobStatus('idle');
+          setCurrentJobId(null);
+          setProgress(0);
+        }, 2000);
+      } else if (result.status === 'failed') {
+        setError(result.error || 'Prediction failed');
+        stopPolling();
+        setJobStatus('idle');
+        setCurrentJobId(null);
+        setProgress(0);
+      }
+    }
+  }, [jobResult, stopPolling]);
+
+  // Update input when initialSmiles changes
+  useEffect(() => {
+    if (initialSmiles) {
+      setSmilesInput(initialSmiles);
+    }
+  }, [initialSmiles]);
+
+  const handleSinglePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
-
+    setResults([]);
+    setProgress(0);
+    
     try {
-      const response = await fetch('/api/predict/single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smiles: smilesInput })
+      const { data } = await submitPredictionJob({
+        variables: { smiles: smilesInput }
       });
-
-      const data = await response.json() as PredictionResult;
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setResults([data]);
+      
+      if (data?.submitPredictionJob) {
+        const jobResponse = data.submitPredictionJob as JobResponse;
+        setCurrentJobId(jobResponse.jobId);
+        setJobStatus('pending');
+        setProgress(10);
+        
+        // Start polling for results
+        getPredictionResult({ variables: { jobId: jobResponse.jobId } });
       }
     } catch (err) {
-      setError('Failed to get prediction. Please try again.');
-    } finally {
-      setLoading(false);
+      setError('Failed to submit prediction. Please try again.');
+      setJobStatus('idle');
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const handleBatchPrediction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please select a file');
+    if (!batchInput.trim()) {
+      setError('Please enter SMILES strings');
       return;
     }
 
     setError('');
-    setLoading(true);
-
-    const formData = new FormData();
-    formData.append('file', file);
+    setResults([]);
+    setProgress(0);
+    
+    // Parse SMILES strings (one per line or comma-separated)
+    const smilesStrings = batchInput
+      .split(/[\n,]/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+      
+    if (smilesStrings.length === 0) {
+      setError('No valid SMILES strings found');
+      return;
+    }
 
     try {
-      const response = await fetch('/api/predict/batch', {
-        method: 'POST',
-        body: formData
+      const { data } = await submitBatchPredictionJob({
+        variables: { smilesStrings }
       });
-
-      const data = await response.json() as PredictionResult[];
-      if (response.ok) {
-        setResults(data);
-      } else {
-        setError(data.detail || 'Failed to process file');
+      
+      if (data?.submitBatchPredictionJob) {
+        const jobResponse = data.submitBatchPredictionJob as JobResponse;
+        setCurrentJobId(jobResponse.jobId);
+        setJobStatus('pending');
+        setProgress(10);
+        
+        // Start polling for results
+        getPredictionResult({ variables: { jobId: jobResponse.jobId } });
       }
     } catch (err) {
-      setError('Failed to upload file. Please try again.');
-    } finally {
-      setLoading(false);
+      setError('Failed to submit batch prediction. Please try again.');
+      setJobStatus('idle');
     }
   };
+
+  const getStatusIcon = () => {
+    switch (jobStatus) {
+      case 'pending':
+      case 'processing':
+        return <Loader2 className="h-4 w-4 animate-spin" />;
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'failed':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (jobStatus) {
+      case 'pending':
+        return 'Queued for processing...';
+      case 'processing':
+        return 'Running prediction model...';
+      case 'completed':
+        return 'Prediction completed!';
+      case 'failed':
+        return 'Prediction failed';
+      default:
+        return '';
+    }
+  };
+
+  const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <Card>
         <CardHeader>
-          <CardTitle>Chemical Permeability Prediction</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Chemical Permeability Prediction
+            {getStatusIcon()}
+          </CardTitle>
           <CardDescription>
-            Enter SMILES notation or upload a CSV file to predict compound permeability
+            Enter SMILES notation to predict compound permeability using machine learning
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="single" className="w-full">
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="single">Single Prediction</TabsTrigger>
               <TabsTrigger value="batch">Batch Prediction</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="single">
+            <TabsContent value="single" className="space-y-4">
               <form onSubmit={handleSinglePrediction} className="space-y-4">
                 <div>
                   <Input
-                    placeholder="Enter SMILES string..."
+                    placeholder="Enter SMILES string (e.g., CCO for ethanol)..."
                     value={smilesInput}
                     onChange={(e) => setSmilesInput(e.target.value)}
-                    className="w-full"
+                    className="w-full font-mono"
+                    disabled={isProcessing}
                   />
                 </div>
-                <Button type="submit" disabled={loading || !smilesInput}>
-                  {loading ? 'Processing...' : 'Predict'}
+                <Button type="submit" disabled={isProcessing || !smilesInput} className="w-full">
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Predict Permeability'
+                  )}
                 </Button>
               </form>
             </TabsContent>
 
-            <TabsContent value="batch">
-              <form onSubmit={handleFileUpload} className="space-y-4">
+            <TabsContent value="batch" className="space-y-4">
+              <form onSubmit={handleBatchPrediction} className="space-y-4">
                 <div>
-                  <Input
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => setFile(e.target.files[0])}
-                    className="w-full"
+                  <textarea
+                    placeholder="Enter multiple SMILES strings (one per line or comma-separated)..."
+                    value={batchInput}
+                    onChange={(e) => setBatchInput(e.target.value)}
+                    className="w-full min-h-[120px] p-3 border border-gray-300 rounded-md font-mono text-sm resize-vertical focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isProcessing}
                   />
                 </div>
-                <Button type="submit" disabled={loading || !file}>
-                  {loading ? 'Processing...' : 'Upload and Predict'}
+                <Button type="submit" disabled={isProcessing || !batchInput.trim()} className="w-full">
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing Batch...
+                    </>
+                  ) : (
+                    'Predict Batch'
+                  )}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
 
+          {/* Progress indicator */}
+          {isProcessing && (
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  {getStatusIcon()}
+                  {getStatusText()}
+                </span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+            </div>
+          )}
+
           {error && (
             <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -135,3 +272,4 @@ const PredictionForm = () => {
 };
 
 export default PredictionForm;
+export { PredictionForm };
