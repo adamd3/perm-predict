@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import PredictionResults from './PredictionResults';
-import { SUBMIT_PREDICTION_JOB, SUBMIT_BATCH_PREDICTION_JOB, GET_PREDICTION_RESULT } from '@/lib/graphql/queries';
+import { SUBMIT_PREDICTION_JOB, GET_PREDICTION_RESULT, GET_JOB_STATUS } from '@/lib/graphql/queries';
 
-import type { PredictionResult, JobResponse, JobResult } from '@/lib/types'
+import type { PredictionResult, JobStatus, JobResult } from '@/lib/types'
 
 interface PredictionFormProps {
   initialSmiles?: string;
@@ -26,8 +26,7 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   const [progress, setProgress] = useState(0);
 
   // GraphQL hooks
-  const [submitPredictionJob] = useMutation(SUBMIT_PREDICTION_JOB);
-  const [submitBatchPredictionJob] = useMutation(SUBMIT_BATCH_PREDICTION_JOB);
+  const [submitPredictionJobMutation] = useMutation(SUBMIT_PREDICTION_JOB);
   const [getPredictionResult, { data: jobResult, stopPolling }] = useLazyQuery(GET_PREDICTION_RESULT, {
     pollInterval: 2000,
     errorPolicy: 'all',
@@ -45,12 +44,8 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
         setProgress(100);
         stopPolling();
         
-        if (result.result) {
-          if (Array.isArray(result.result)) {
-            setResults(result.result);
-          } else {
-            setResults([result.result]);
-          }
+        if (result.results) {
+          setResults(result.results);
         }
         
         // Reset after a delay
@@ -83,12 +78,12 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     setProgress(0);
     
     try {
-      const { data } = await submitPredictionJob({
-        variables: { smiles: smilesInput }
+      const { data } = await submitPredictionJobMutation({
+        variables: { jobInput: { smilesList: [smilesInput], jobName: 'Single Prediction' } }
       });
       
       if (data?.submitPredictionJob) {
-        const jobResponse = data.submitPredictionJob as JobResponse;
+        const jobResponse = data.submitPredictionJob as JobStatus;
         setCurrentJobId(jobResponse.jobId);
         setJobStatus('pending');
         setProgress(10);
@@ -125,12 +120,12 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     }
 
     try {
-      const { data } = await submitBatchPredictionJob({
-        variables: { smilesStrings }
+      const { data } = await submitPredictionJobMutation({
+        variables: { jobInput: { smilesList: smilesStrings, jobName: 'Batch Prediction' } }
       });
       
       if (data?.submitBatchPredictionJob) {
-        const jobResponse = data.submitBatchPredictionJob as JobResponse;
+        const jobResponse = data.submitBatchPredictionJob as JobStatus;
         setCurrentJobId(jobResponse.jobId);
         setJobStatus('pending');
         setProgress(10);

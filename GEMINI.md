@@ -65,20 +65,6 @@ The backend uses a decoupled, asynchronous architecture to handle computationall
 - **Components**: `frontend/src/components/` - React components for the input form, results display, loading states, and molecular viewers.
 - **Styling**: Use Tailwind CSS with custom theme configuration and shadcn/ui components.
 
-### What We Can Build Now:
-
-We can work on the following aspects of the frontend:
-
-1. GraphQL Client with Mocked Data - Replace the current REST API with Apollo Client and create mock resolvers that simulate the async job submission/polling pattern described in your architecture.
-2. Chemical Structure Editor - For the graphical interface, Ketcher is an excellent choice. It's the gold standard for web-based chemical structure editing, supports SMILES export, and has good
-   React integration options.
-3. Enhanced UI Components - Your current foundation is solid, but we can add:
-
-- Better results visualization with confidence intervals
-- Loading states that show polling progress
-- Molecular structure viewers for results
-- Batch processing improvements
-
 ### Key Data Flow (Asynchronous Polling)
 
 1.  User submits a SMILES string via the Next.js frontend.
@@ -174,7 +160,7 @@ The plan is to build the application in logical stages, following a standard "cr
 - ✅ GraphQL API with async job processing via Celery
 - ✅ Core backend tests for feature processing functionality
 
-**🚧 CURRENT PRIORITY:**
+**🚧 TODO:**
 
 - Test full pipeline with actual model files
 
@@ -199,3 +185,23 @@ Steps of Phase 4:
 3.  Build the "Suggestions" UI:
 
 - Create new components in our Next.js frontend that allow users to request and visualize the suggested molecular improvements.
+
+### What We Can Build Now:
+
+The next logical step is to begin Phase 2: Develop the core Next.js frontend UI and data-fetching logic.
+
+This involves building the user interface for submitting SMILES strings and displaying the prediction results. While we proceed with the frontend, it will be crucial to thoroughly test the integrated
+backend pipeline (GraphQL API, Celery worker, and the feature generation script) to ensure it's robust and reliable. We can use the existing backend tests and potentially write new ones to cover the full
+data flow.
+
+We can work on the following aspects of the frontend:
+
+1. GraphQL Client with Mocked Data - Replace the current REST API with Apollo Client and create mock resolvers that simulate the async job submission/polling pattern described in your architecture.
+2. Chemical Structure Editor - For the graphical interface, Ketcher is an excellent choice. It's the gold standard for web-based chemical structure editing, supports SMILES export, and has good
+   React integration options.
+3. Enhanced UI Components - Your current foundation is solid, but we can add:
+
+- Better results visualization with confidence intervals
+- Loading states that show polling progress
+- Molecular structure viewers for results
+- Batch processing improvements
