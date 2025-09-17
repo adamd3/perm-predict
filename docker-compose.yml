@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   redis:
@@ -13,8 +13,8 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
@@ -37,8 +37,8 @@ services:
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     volumes:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
@@ -47,7 +47,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - MODEL_CLASSIFIER_PATH=/app/app/ml_models/classifier_model.pkl
       - MODEL_REGRESSOR_PATH=/app/app/ml_models/regressor_model.pkl
-    command: celery -A app.worker.celery_app worker --loglevel=info
+    command: celery -A app.worker.celery_app worker --loglevel=debug
     depends_on:
       redis:
         condition: service_healthy
@@ -56,6 +56,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - BACKEND_URL=http://api:8000
     ports:
       - "3000:3000"
     environment:
