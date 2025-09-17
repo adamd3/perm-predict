@@ -12,3 +12,5 @@ joblib
 pydantic
 pydantic-settings
 pytest
+torch
+pandas

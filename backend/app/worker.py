@@ -5,11 +5,12 @@ import pickle
 import numpy as np
 import os
 import torch
+import traceback # Import traceback
 
 from app.config import settings
 from app.utils.logger import setup_logging
 from app.utils.processing import smiles_to_comprehensive_features, combine_features
-from app.ml_models.alvadesc_feature_generation import generate_alvadesc_descriptors
+from app.ml_models.alvadesc_feature_generation import generate_all_features
 from app.models import PredictionFeatures, MolecularDescriptors # Import Pydantic models
 
 setup_logging()
@@ -163,6 +164,7 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
     """
     Predict permeability for a list of SMILES strings using classification model only.
     """
+    logger.info("predict_permeability task started.")
     try:
         # Ensure models are loaded
         if classifier_model is None:
@@ -172,40 +174,25 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
         
         for smiles in smiles_list:
             try:
-                # Extract features using alvaDesc CLI wrapper
-                # This will use the dummy feature generation until alvadesccliwrapper is installed and licensed
-                alvadesc_descriptors_df = generate_alvadesc_descriptors(smiles)
+                # Extract features using alvaDesc CLI wrapper and Morgan fingerprints
+                all_features_df = generate_all_features(smiles)
                 
                 # Convert DataFrame to numpy array for model input
-                # Assuming generate_alvadesc_descriptors returns a DataFrame with 10160 columns
-                feature_vector = alvadesc_descriptors_df.values.astype(np.float32)
+                feature_vector = all_features_df.values.astype(np.float32)
 
                 # Ensure feature_vector has the correct shape (1, 10160) for a single sample
                 if feature_vector.ndim == 1:
                     feature_vector = feature_vector.reshape(1, -1)
                 elif feature_vector.ndim > 2:
-                    # Handle cases where DataFrame might have multiple rows unexpectedly
                     # For now, we'll take the first row if multiple are returned for a single SMILES
                     feature_vector = feature_vector[0].reshape(1, -1)
 
-                # --- Placeholder for features in result ---
-                # For now, creating dummy PredictionFeatures and MolecularDescriptors
-                # This will need to be properly mapped once real alvaDesc output is available
-                dummy_molecular_descriptors = MolecularDescriptors(
-                    mol_wt=0.0, log_p=0.0, tpsa=0.0, num_h_donors=0, num_h_acceptors=0,
-                    num_rotatable_bonds=0, num_aromatic_rings=0
-                )
-                dummy_prediction_features = PredictionFeatures(
-                    morgan_fingerprint=[0] * 2048, # Assuming a common Morgan fingerprint size
-                    descriptors=dummy_molecular_descriptors
-                )
-                # The actual feature_vector (from alvaDesc) will be stored here for now
-                # This will need to be refined to match the PredictionFeatures model structure
+                # Store the generated features for the result
                 processed_features_for_result = {
-                    "alvadesc_feature_vector": feature_vector.tolist() # Store as list for JSON serialization
+                    "feature_vector": feature_vector.tolist() # Store as list for JSON serialization
                 }
-                # --- End Placeholder ---
 
+                logger.info(f"Feature vector shape: {feature_vector.shape}")
                 # Classification prediction
                 if classifier_model is not None:
                     classifier_pred = classifier_model.predict(feature_vector)[0]
@@ -232,7 +219,8 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
                 }
                 
             except Exception as e:
-                logger.error(f"Error processing SMILES {smiles}: {e}")
+                logger.exception(f"Error processing SMILES {smiles}: {e}")
+                traceback.print_exc() # Print full traceback
                 result = {
                     'smiles': smiles,
                     'prediction': 0,
@@ -256,6 +244,7 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
         
     except Exception as e:
         logger.error(f"Task failed: {e}")
+        traceback.print_exc() # Print full traceback
         self.retry(countdown=60, max_retries=3)
         return {
             'status': 'failed',
