@@ -22,7 +22,7 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'error' | 'submitted'>('idle');
   const [progress, setProgress] = useState(0);
 
   // GraphQL hooks
