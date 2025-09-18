@@ -1,6 +1,7 @@
 FROM node:18-alpine
 
 ARG BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
 
 WORKDIR /app
 
@@ -19,4 +20,6 @@ COPY eslint.config.mjs .
 
 RUN npm run build
 
-CMD ["npm", "start"]
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]

@@ -124,7 +124,7 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
         variables: { jobInput: { smilesList: smilesStrings, jobName: 'Batch Prediction' } }
       });
       
-      if (data?.submitBatchPredictionJob) {
+      if (data?.submitPredictionJob) {
         const jobResponse = data.submitBatchPredictionJob as JobStatus;
         setCurrentJobId(jobResponse.jobId);
         setJobStatus('pending');
