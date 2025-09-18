@@ -22,13 +22,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
-    # Add any other system dependencies required by alvaDescCLI or its dependencies
-    # For example, if alvaDescCLI needs specific shared libraries
-    # libx11-6 libxext6 libxrender1 libfontconfig1 libglib2.0-0
     && rm -rf /var/lib/apt/lists/*
 
 # Copy alvaDescCLI executable from the build context (project root)
-COPY alvaDescCLI /app/backend/app/ml_models/alvaDescCLI
+COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
+COPY ./backend/test_feature_generation.py /app/test_feature_generation.py
 
 # Copy alvadesccliwrapper package from mamba_builder stage
 # This assumes alvadesccliwrapper is installed in site-packages

@@ -1,4 +1,3 @@
-from celery import Celery
 from typing import List, Dict, Any, Optional
 import logging
 import pickle
@@ -12,27 +11,38 @@ from app.utils.logger import setup_logging
 from app.utils.processing import smiles_to_comprehensive_features, combine_features
 from app.ml_models.alvadesc_feature_generation import generate_all_features
 from app.models import PredictionFeatures, MolecularDescriptors # Import Pydantic models
+from app.celery_instance import celery_app # Import celery_app from the new instance file
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
-celery_app = Celery(
-    "perm_predict_worker",
-    broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.worker"]
-)
-
-celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-)
-
 # Load ML models at startup
 classifier_model = None
+
+# This function will be called by the worker when it starts
+@celery_app.on_after_configure.connect
+def setup_models(sender, **kwargs):
+    global classifier_model
+    try:
+        # Load binary classifier
+        classifier_path = settings.MODEL_CLASSIFIER_PATH
+        if os.path.exists(classifier_path):
+            with open(classifier_path, 'rb') as f:
+                classifier_model = pickle.load(f)
+            logger.info("Classifier model loaded successfully")
+        else:
+            logger.warning(f"Classifier model not found at {classifier_path}")
+            
+        if classifier_model is None:
+            logger.error("Classifier model could not be loaded - check model file path")
+            
+    except Exception as e:
+        logger.error(f"Failed to load classifier model: {e}")
+        raise
+
+# Remove the direct call to load_models() at the end of the file
+# It will now be called via @celery_app.on_after_configure.connect
+
 
 def load_models():
     """Load the classification model (simplified for classification-only mode)."""
@@ -164,7 +174,6 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
     """
     Predict permeability for a list of SMILES strings using classification model only.
     """
-    logger.info("predict_permeability task started.")
     try:
         # Ensure models are loaded
         if classifier_model is None:
@@ -252,8 +261,3 @@ def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
             'results': []
         }
 
-# Initialize models when worker starts
-try:
-    load_models()
-except Exception as e:
-    logger.warning(f"Models not loaded at startup: {e}")

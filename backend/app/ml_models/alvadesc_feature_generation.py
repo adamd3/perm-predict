@@ -3,7 +3,14 @@ import numpy as np
 import os
 import json
 from alvadesccliwrapper.alvadesc import AlvaDesc
-from .input_generation import smiles_to_morgan_fp
+try:
+    from .input_generation import smiles_to_morgan_fp
+except ImportError:
+    # When run as a script, adjust path and import directly
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
+    from input_generation import smiles_to_morgan_fp
 
 # --- Configuration ---
 ALVADESC_CLI_PATH = "/app/backend/app/ml_models/alvaDescCLI"

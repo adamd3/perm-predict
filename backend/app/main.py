@@ -13,6 +13,9 @@ from app.schema import schema
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
+        if request.method == "POST" and request.url.path == "/graphql":
+            body = await request.body()
+            logging.info(f"GraphQL Request Body: {body.decode()}")
         response = await call_next(request)
         process_time = time.time() - start_time
         logging.info(

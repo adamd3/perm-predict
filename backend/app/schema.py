@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
-from app.worker import celery_app
+from app.celery_instance import celery_app
 from app.models import (
     MolecularDescriptors as MolecularDescriptorsModel,
     PredictionFeatures as PredictionFeaturesModel,
@@ -166,6 +166,7 @@ class Query:
 class Mutation:
     @strawberry.field
     def submit_prediction_job(self, job_input: PredictionJobInput) -> JobStatus:
+
         """Submit a new prediction job and return the job ID."""
         try:
             # Validate input
@@ -189,6 +190,7 @@ class Mutation:
                     'job_name': job_input.job_name
                 }
             )
+
             
             # Store job metadata in Redis for timestamp tracking
             celery_app.backend.set(
