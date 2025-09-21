@@ -162,6 +162,8 @@ class Query:
                 error=f"Failed to get job status: {str(e)}"
             )
 
+from app.utils.logger import logger
+
 @strawberry.type
 class Mutation:
     @strawberry.field
@@ -214,7 +216,7 @@ class Mutation:
                 job_id="",
                 status='error',
                 created_at=datetime.now().isoformat(),
-                error=f"Failed to submit job: {str(e)}"
+                error=str(e)
             )
 
 schema = strawberry.Schema(

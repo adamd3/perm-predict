@@ -17,7 +17,7 @@ from collections import Counter
 from typing import List
 
 # Chemistry
-from rdkit import Chem
+from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
 
 
@@ -37,7 +37,7 @@ def smiles_to_morgan_fp(smiles: str,
     if mol is None:
         return np.zeros(n_bits, dtype=np.int8)
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, n_bits)
-    return np.frombuffer(fp.ToBitString().encode(), "u1") - ord("0")
+    return np.array(fp, dtype=np.int8)
 
 # Data Loading & Pre‑processing
 

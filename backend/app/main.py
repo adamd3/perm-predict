@@ -6,7 +6,7 @@ import time
 import logging
 import datetime
 
-from app.utils.logger import setup_logging
+from app.utils.logger import logger
 from app.schema import schema
 
 
@@ -26,7 +26,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 # Initialize logging
-setup_logging()
+
 
 # Create FastAPI app
 app = FastAPI(

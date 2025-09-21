@@ -5,7 +5,7 @@ celery_app = Celery(
     "perm_predict_worker",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.worker"]
+    include=["app.worker", "app.test_task"]
 )
 
 celery_app.conf.update(

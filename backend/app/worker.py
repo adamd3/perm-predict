@@ -7,14 +7,13 @@ import torch
 import traceback # Import traceback
 
 from app.config import settings
-from app.utils.logger import setup_logging
+from app.utils.logger import logger
 from app.utils.processing import smiles_to_comprehensive_features, combine_features
 from app.ml_models.alvadesc_feature_generation import generate_all_features
 from app.models import PredictionFeatures, MolecularDescriptors # Import Pydantic models
 from app.celery_instance import celery_app # Import celery_app from the new instance file
 
-setup_logging()
-logger = logging.getLogger(__name__)
+
 
 # Load ML models at startup
 classifier_model = None
@@ -170,10 +169,41 @@ def calculate_classification_confidence(classifier_proba: np.ndarray) -> Dict[st
 
 
 @celery_app.task(bind=True, name="predict_permeability")
-def predict_permeability(self, smiles_list: List[str]) -> Dict[str, Any]:
+def predict_permeability(self, smiles_list: List[str], created_at: Optional[str] = None, job_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Predict permeability for a list of SMILES strings using classification model only.
     """
+    logger.info(f"predict_permeability received smiles_list: type={type(smiles_list)}, content={smiles_list}")
+    if not isinstance(smiles_list, list):
+        logger.error(f"smiles_list is not a list! Type: {type(smiles_list)}")
+        raise TypeError("smiles_list must be a list of strings")
+    if not all(isinstance(s, str) for s in smiles_list):
+        logger.error(f"smiles_list contains non-string elements: {smiles_list}")
+        raise TypeError("All elements in smiles_list must be strings")
+
+    # --- Dummy Result for Testing ---
+    dummy_results = []
+    for smiles in smiles_list:
+        dummy_results.append({
+            'smiles': smiles,
+            'prediction': 1, # Dummy permeant
+            'confidence': 0.99,
+            'uncertainty': 0.01,
+            'class_probabilities': [0.01, 0.99],
+            'classifier_prediction': 1,
+            'features': None,
+            'error': None
+        })
+
+    return {
+        'status': 'completed',
+        'results': dummy_results,
+        'total_processed': len(dummy_results),
+        'successful': len(dummy_results),
+        'failed': 0
+    }
+    # --- End Dummy Result ---
+
     try:
         # Ensure models are loaded
         if classifier_model is None:
