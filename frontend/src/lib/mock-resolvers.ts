@@ -42,7 +42,6 @@ export const mockResolvers = {
       // Create job with pending status
       mockJobs[jobId] = {
         jobId,
-        status: 'pending',
         createdAt,
         results: [],
         totalProcessed: 0,
@@ -52,9 +51,7 @@ export const mockResolvers = {
 
       // Simulate async processing
       setTimeout(() => {
-        if (mockJobs[jobId]) {
-          mockJobs[jobId].status = 'processing';
-        }
+        // No status update here, as mockJobs stores JobResult, not JobStatus
       }, 500);
 
       setTimeout(() => {
@@ -63,7 +60,6 @@ export const mockResolvers = {
             const result = generateMockPrediction(smiles);
             mockJobs[jobId] = {
               ...mockJobs[jobId],
-              status: 'completed',
               results: [result],
               totalProcessed: 1,
               successful: 1,
@@ -72,7 +68,6 @@ export const mockResolvers = {
           } catch (error) {
             mockJobs[jobId] = {
               ...mockJobs[jobId],
-              status: 'failed',
               error: 'Invalid SMILES string',
               completedAt: new Date().toISOString(),
             };
@@ -89,7 +84,6 @@ export const mockResolvers = {
 
       mockJobs[jobId] = {
         jobId,
-        status: 'pending',
         createdAt,
         results: [],
         totalProcessed: 0,
@@ -98,9 +92,7 @@ export const mockResolvers = {
       };
 
       setTimeout(() => {
-        if (mockJobs[jobId]) {
-          mockJobs[jobId].status = 'processing';
-        }
+        // No status update here, as mockJobs stores JobResult, not JobStatus
       }, 1000);
 
       setTimeout(() => {
@@ -109,7 +101,6 @@ export const mockResolvers = {
             const results = smilesStrings.map(generateMockPrediction);
             mockJobs[jobId] = {
               ...mockJobs[jobId],
-              status: 'completed',
               results,
               totalProcessed: results.length,
               successful: results.length,
@@ -118,7 +109,6 @@ export const mockResolvers = {
           } catch (error) {
             mockJobs[jobId] = {
               ...mockJobs[jobId],
-              status: 'failed',
               error: 'Failed to process batch',
               completedAt: new Date().toISOString(),
             };

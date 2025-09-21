@@ -30,7 +30,6 @@ export interface PredictionResult {
 }
 
 export interface JobResult {
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'error' | 'submitted';
   results: PredictionResult[];
   totalProcessed: number;
   successful: number;

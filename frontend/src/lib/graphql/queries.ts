@@ -15,7 +15,6 @@ export const SUBMIT_PREDICTION_JOB = gql`
 export const GET_PREDICTION_RESULT = gql`
   query GetPredictionResult($jobId: String!) {
     getPredictionResult(jobId: $jobId) {
-      status
       jobId
       createdAt
       completedAt
