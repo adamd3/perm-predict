@@ -41,6 +41,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./backend/app ./app
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
 COPY full_feature_names.json /app/full_feature_names.json
+COPY desc_smiles.tsv /app/desc_smiles.tsv
 
 EXPOSE 8000
 
