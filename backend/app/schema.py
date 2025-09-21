@@ -121,6 +121,8 @@ class Query:
             # Retrieve job metadata from Redis
             try:
                 metadata = celery_app.backend.get(f"job_metadata:{job_id}")
+                if metadata:
+                    metadata = json.loads(metadata) # Manually deserialize from JSON string
                 created_at = metadata.get('created_at') if metadata else datetime.now().isoformat()
             except:
                 created_at = datetime.now().isoformat()
@@ -164,6 +166,8 @@ class Query:
 
 from app.utils.logger import logger
 
+import json
+
 @strawberry.type
 class Mutation:
     @strawberry.field
@@ -195,13 +199,14 @@ class Mutation:
 
             
             # Store job metadata in Redis for timestamp tracking
+            metadata_to_store = {
+                'created_at': created_at,
+                'job_name': job_input.job_name,
+                'smiles_count': len(job_input.smiles_list)
+            }
             celery_app.backend.set(
                 f"job_metadata:{task.id}",
-                {
-                    'created_at': created_at,
-                    'job_name': job_input.job_name,
-                    'smiles_count': len(job_input.smiles_list)
-                }
+                json.dumps(metadata_to_store) # Manually serialize to JSON string
             )
             
             return JobStatusModel(

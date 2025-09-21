@@ -27,14 +27,13 @@ export const GET_PREDICTION_RESULT = gql`
         confidence
         uncertainty
         classifierPrediction
-        classProbabilities
         features {
-          # For now, we'll just fetch the alvadesc_feature_vector
-          # This will need to be refined once the real alvaDesc output is mapped
-          alvadescFeatureVector
+          __typename
         }
         error
+        __typename
       }
+      __typename
     }
   }
 `;

@@ -65,7 +65,7 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                   )}
                 </TableCell>
                 <TableCell className="font-semibold">
-                  {result.error ? '—' : `${(result.classProbabilities[1] * 100).toFixed(1)}%`}
+                  {result.error ? '—' : `${(result.confidence * 100).toFixed(1)}%`}
                 </TableCell>
                 <TableCell>
                   {result.error ? '—' : (
