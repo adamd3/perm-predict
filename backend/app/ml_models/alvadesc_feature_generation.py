@@ -114,8 +114,7 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
         alva_desc_rows = []
         for smiles in smiles_list:
             if smiles not in mock_data.index:
-                print(f"Error: SMILES string '{smiles}' not found in mock TSV data. Returning empty DataFrame.")
-                return pd.DataFrame()  # Return empty DataFrame if SMILES not found
+                raise ValueError(f"SMILES string '{smiles}' not found in mock TSV data.")
             alva_desc_rows.append(mock_data.loc[smiles])
 
         temp_alva_desc_df = pd.DataFrame(alva_desc_rows, index=smiles_list)
