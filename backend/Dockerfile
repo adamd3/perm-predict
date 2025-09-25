@@ -39,6 +39,8 @@ COPY ./backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./backend/app ./app
+
+COPY ./backend/app/ml_models/model_mtb.json ./app/ml_models/model_mtb.json
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
 COPY full_feature_names.json /app/full_feature_names.json
 COPY desc_smiles.tsv /app/desc_smiles.tsv

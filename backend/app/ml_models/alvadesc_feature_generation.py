@@ -26,9 +26,16 @@ SMILES_COLUMN_NAME = "Smiles"  # Name of the SMILES column in the TSV file
 # --- Load feature names ---
 try:
     with open(ALVADESC_DESCRIPTOR_NAMES_PATH, "r") as f:
-        ALVADESC_DESCRIPTOR_NAMES = json.load(f)
+        ALVADESC_ALL_AVAILABLE_NAMES = json.load(f)
     with open(FULL_FEATURE_NAMES_PATH, "r") as f:
         FULL_FEATURE_NAMES = json.load(f)
+
+    # Filter ALVADESC_DESCRIPTOR_NAMES to only include those present in FULL_FEATURE_NAMES
+    # and that are not Morgan fingerprints
+    ALVADESC_DESCRIPTOR_NAMES = [name for name in ALVADESC_ALL_AVAILABLE_NAMES if name in FULL_FEATURE_NAMES and not name.startswith("fp_")]
+
+    # Determine the exact number of Morgan fingerprints from FULL_FEATURE_NAMES
+    MORGAN_FINGERPRINT_COUNT = len([f for f in FULL_FEATURE_NAMES if f.startswith("fp_")])
 except FileNotFoundError as e:
     print(f"Error loading feature names JSON: {e}")
     ALVADESC_DESCRIPTOR_NAMES = []
@@ -97,8 +104,8 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
         return pd.DataFrame()
 
     # --- Generate Morgan Fingerprints ---
-    morgan_fps = [smiles_to_morgan_fp(s) for s in smiles_list]
-    morgan_df = pd.DataFrame(morgan_fps, columns=[f"fp_{i}" for i in range(len(morgan_fps[0]))], index=smiles_list)
+    morgan_fps = [smiles_to_morgan_fp(s, n_bits=MORGAN_FINGERPRINT_COUNT) for s in smiles_list]
+    morgan_df = pd.DataFrame(morgan_fps, columns=[f"fp_{i}" for i in range(MORGAN_FINGERPRINT_COUNT)], index=smiles_list)
 
     # --- Generate alvaDesc Descriptors ---
     alva_desc_df = pd.DataFrame(index=smiles_list)

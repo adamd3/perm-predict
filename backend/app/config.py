@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from pathlib import Path
 
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str
     
     # ML Model Paths
-    MODEL_CLASSIFIER_PATH: str = "app/ml_models/classifier_model.pkl"
+    MODEL_CLASSIFIER_PATH: str = os.getenv("MODEL_CLASSIFIER_PATH", "app/ml_models/model_mtb.json")
     
     # Regression/Ensemble Model Paths (commented out for classification-only mode)
     # MODEL_REGRESSOR_PATH: str = "app/ml_models/regressor_model.pkl"  # Legacy - kept for compatibility
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
     # Logging
     LOG_DIR: str = "logs"
     LOG_LEVEL: str = "INFO"
+    CELERY_WORKER_LOG_LEVEL: str = "INFO"
+
+    # Feature Generation
+    MOCK_ALVADESC: bool = False
     
     # API Settings
     API_TITLE: str = "Perm-Predict GraphQL API"

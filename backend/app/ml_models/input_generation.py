@@ -19,6 +19,7 @@ from typing import List
 # Chemistry
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
+from rdkit.Chem import rdFingerprintGenerator
 
 
 
@@ -36,7 +37,10 @@ def smiles_to_morgan_fp(smiles: str,
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return np.zeros(n_bits, dtype=np.int8)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, n_bits)
+    
+    # Use rdFingerprintGenerator to avoid deprecation warning
+    gen = rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
+    fp = gen.Get='MorganFingerprint'(mol)
     return np.array(fp, dtype=np.int8)
 
 # Data Loading & Pre‑processing
