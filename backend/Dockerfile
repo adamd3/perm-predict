@@ -14,7 +14,7 @@ RUN micromamba create -n alvadesc python=3.8 openjdk=11 -c conda-forge -c biocon
     micromamba clean --all --yes
 
 # Stage 2: backend_runner - Build the final backend image
-FROM python:3.8-slim-bullseye AS backend_runner
+FROM python:3.8 AS backend_runner
 
 WORKDIR /app
 
@@ -22,11 +22,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libgomp1 \
+    libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy alvaDescCLI executable from the build context (project root)
 COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
-COPY ./backend/test_feature_generation.py /app/test_feature_generation.py
 
 # Copy alvadesccliwrapper package from mamba_builder stage
 # This assumes alvadesccliwrapper is installed in site-packages
@@ -39,6 +40,10 @@ COPY ./backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./backend/app ./app
+COPY ./backend/test_dmatrix.py ./test_dmatrix.py
+COPY ./backend/test_smiles_not_in_tsv.py ./test_smiles_not_in_tsv.py
+COPY ./backend/test_xgb_import.py ./test_xgb_import.py
+COPY ./backend/test_model_load_predict.py ./test_model_load_predict.py
 
 COPY ./backend/app/ml_models/model_mtb.json ./app/ml_models/model_mtb.json
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
