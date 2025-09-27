@@ -19,33 +19,28 @@ from typing import List
 # Chemistry
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
-from rdkit.Chem import rdFingerprintGenerator
 
 
+CSV_PATH: str = "..."  # Raw dataset
+FINGERPRINT_LEN: int = 4200  # Bits in Morgan FP
+FINGERPRINT_RADIUS: int = 2  # Radius for FP
+TRAIN_TEST_SPLIT: float = 0.20  # Test fraction
+RANDOM_STATE: int = 42  # Reproducibility
 
-CSV_PATH: str = "..."           # Raw dataset
-FINGERPRINT_LEN: int = 4200                      # Bits in Morgan FP
-FINGERPRINT_RADIUS: int = 2                      # Radius for FP
-TRAIN_TEST_SPLIT: float = 0.20                   # Test fraction
-RANDOM_STATE: int = 42                           # Reproducibility
 
-
-def smiles_to_morgan_fp(smiles: str,
-                        radius: int = FINGERPRINT_RADIUS,
-                        n_bits: int = FINGERPRINT_LEN) -> np.ndarray:
+def smiles_to_morgan_fp(smiles: str, radius: int = FINGERPRINT_RADIUS, n_bits: int = FINGERPRINT_LEN) -> np.ndarray:
     """Convert a SMILES string to a binary Morgan fingerprint."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return np.zeros(n_bits, dtype=np.int8)
-    
-    # Use rdFingerprintGenerator to avoid deprecation warning
-    gen = rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
-    fp = gen.Get='MorganFingerprint'(mol)
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, n_bits)
     return np.array(fp, dtype=np.int8)
+
 
 # Data Loading & Pre‑processing
 
-def load_and_preprocess(path: str) -> tuple[pd.DataFrame, List[str], List[str], List[str]]: 
+
+def load_and_preprocess(path: str) -> tuple[pd.DataFrame, List[str], List[str], List[str]]:
     """Load raw CSV, clean, and generate all feature blocks.
 
     Returns
@@ -68,13 +63,13 @@ def load_and_preprocess(path: str) -> tuple[pd.DataFrame, List[str], List[str], 
     df["target"] = (df["AVG_cells"] >= 200).astype(int)
     print("Class distribution:", Counter(df["target"]))
 
-    # Morgan fingerprints 
+    # Morgan fingerprints
 
     df["fp"] = df["Smiles"].astype(str).apply(smiles_to_morgan_fp)
     fp_cols = [f"fp_{i}" for i in range(FINGERPRINT_LEN)]
     df = pd.concat([df, pd.DataFrame(df["fp"].tolist(), columns=fp_cols)], axis=1)
 
-    # Additional numeric descriptors 
+    # Additional numeric descriptors
 
     excluded = {"Smiles", "AVG_cells", "target", *fp_cols}
     desc_cols = [c for c in df.columns if c not in excluded and pd.api.types.is_numeric_dtype(df[c])]
@@ -82,6 +77,7 @@ def load_and_preprocess(path: str) -> tuple[pd.DataFrame, List[str], List[str], 
 
     df = df.drop(columns=["fp"])  # raw list columns no longer needed
     return df, fp_cols, desc_cols
+
 
 # Main script
 

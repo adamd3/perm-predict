@@ -32,7 +32,7 @@ try:
 
     # Filter ALVADESC_DESCRIPTOR_NAMES to only include those present in FULL_FEATURE_NAMES
     # and that are not Morgan fingerprints
-    ALVADESC_DESCRIPTOR_NAMES = [name for name in ALVADESC_ALL_AVAILABLE_NAMES if name in FULL_FEATURE_NAMES and not name.startswith("fp_")]
+    ALVADESC_DESCRIPTOR_NAMES = [name for name in FULL_FEATURE_NAMES if not name.startswith("fp_")]
 
     # Determine the exact number of Morgan fingerprints from FULL_FEATURE_NAMES
     MORGAN_FINGERPRINT_COUNT = len([f for f in FULL_FEATURE_NAMES if f.startswith("fp_")])
@@ -58,8 +58,25 @@ def load_mock_descriptors_from_tsv(file_path):
     print(f"Loading mock data from TSV: {file_path}...")
     try:
         full_df = pd.read_csv(file_path, sep="\t", index_col=SMILES_COLUMN_NAME)
+
+        # Ensure all expected ALVADESC_DESCRIPTOR_NAMES are present, fill missing with 0.0
+        missing_from_tsv = [desc_name for desc_name in ALVADESC_DESCRIPTOR_NAMES if desc_name not in full_df.columns]
+        if missing_from_tsv:
+            print(f"DEBUG: Columns missing from desc_smiles.tsv: {missing_from_tsv}. Adding with 0.0.")
+            for desc_name in missing_from_tsv:
+                full_df[desc_name] = 0.0
+
+        # Drop any extra columns that are not in ALVADESC_DESCRIPTOR_NAMES
+        extra_cols_in_mock = [col for col in full_df.columns if col not in ALVADESC_DESCRIPTOR_NAMES and col != SMILES_COLUMN_NAME]
+        if extra_cols_in_mock:
+            print(f"Warning: Extra columns in mock data from TSV: {extra_cols_in_mock}. Dropping them.")
+            full_df = full_df.drop(columns=extra_cols_in_mock)
+
+        # Select and reorder columns to match ALVADESC_DESCRIPTOR_NAMES
+        full_df = full_df[ALVADESC_DESCRIPTOR_NAMES]
+
         mock_tsv_data_cache = full_df
-        print(f"Successfully loaded {len(mock_tsv_data_cache)} rows from TSV.")
+        print(f"Successfully loaded {len(mock_tsv_data_cache)} rows from TSV with {len(ALVADESC_DESCRIPTOR_NAMES)} alvaDesc features.")
         return mock_tsv_data_cache
     except FileNotFoundError:
         print(f"Error: Mock TSV file not found at {file_path}")
@@ -121,7 +138,8 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
         alva_desc_rows = []
         for smiles in smiles_list:
             if smiles not in mock_data.index:
-                raise ValueError(f"SMILES string '{smiles}' not found in mock TSV data.")
+                print(f"DEBUG: SMILES '{smiles}' not found in mock_data.index. Raising ValueError.") # New line
+                raise ValueError("SMILES string must be in the example set.")
             alva_desc_rows.append(mock_data.loc[smiles])
 
         temp_alva_desc_df = pd.DataFrame(alva_desc_rows, index=smiles_list)
@@ -177,18 +195,24 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
     combined_df = pd.concat([morgan_df, alva_desc_df], axis=1)
 
     # --- Reorder columns to match model's expected input ---
-    if FULL_FEATURE_NAMES and len(FULL_FEATURE_NAMES) == combined_df.shape[1]:
-        # Ensure all columns in FULL_FEATURE_NAMES are in combined_df
+    if FULL_FEATURE_NAMES:
+        # Add any missing columns to combined_df and fill with 0.0
         missing_cols = [col for col in FULL_FEATURE_NAMES if col not in combined_df.columns]
         if missing_cols:
-            print(f"Warning: Missing columns in combined features: {missing_cols}. Filling with NaN.")
+            print(f"Warning: Missing columns in combined features: {missing_cols}. Filling with 0.0.")
             for col in missing_cols:
-                combined_df[col] = np.nan
+                combined_df[col] = 0.0
+
+        # Drop any extra columns that are not in FULL_FEATURE_NAMES
+        extra_cols = [col for col in combined_df.columns if col not in FULL_FEATURE_NAMES]
+        if extra_cols:
+            print(f"Warning: Extra columns in combined features: {extra_cols}. Dropping them.")
+            combined_df = combined_df.drop(columns=extra_cols)
 
         # Reorder and select only the columns expected by the model
         final_features_df = combined_df[FULL_FEATURE_NAMES]
     else:
-        print("Warning: Full feature names not loaded or mismatch in feature count. Returning combined_df as is.")
+        print("Warning: Full feature names not loaded. Returning combined_df as is.")
         final_features_df = combined_df
 
     print(f"Generated combined features for {len(smiles_list)} SMILES strings.")

@@ -40,10 +40,6 @@ COPY ./backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./backend/app ./app
-COPY ./backend/test_dmatrix.py ./test_dmatrix.py
-COPY ./backend/test_smiles_not_in_tsv.py ./test_smiles_not_in_tsv.py
-COPY ./backend/test_xgb_import.py ./test_xgb_import.py
-COPY ./backend/test_model_load_predict.py ./test_model_load_predict.py
 
 COPY ./backend/app/ml_models/model_mtb.json ./app/ml_models/model_mtb.json
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
