@@ -43,14 +43,9 @@ def convert_features_to_model(features_dict: Dict[str, Any]) -> Optional[Predict
     if not features_dict:
         return None
     
+    # Assuming features_dict['descriptors'] is now a list of floats
     descriptors = MolecularDescriptorsModel(
-        mol_wt=features_dict['descriptors']['MolWt'],
-        log_p=features_dict['descriptors']['LogP'],
-        tpsa=features_dict['descriptors']['TPSA'],
-        num_h_donors=features_dict['descriptors']['NumHDonors'],
-        num_h_acceptors=features_dict['descriptors']['NumHAcceptors'],
-        num_rotatable_bonds=features_dict['descriptors']['NumRotatableBonds'],
-        num_aromatic_rings=features_dict['descriptors']['NumAromaticRings']
+        alvadesc_features=features_dict['descriptors']['alvadesc_features']
     )
     
     return PredictionFeaturesModel(

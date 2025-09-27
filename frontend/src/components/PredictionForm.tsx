@@ -75,8 +75,10 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   useEffect(() => {
     if (predictionResultData?.getPredictionResult) {
       const result = predictionResultData.getPredictionResult as JobResult;
+      console.log("Received predictionResultData:", result);
       if (result.results) {
         setResults(result.results);
+        console.log("Updated results state with:", result.results);
       }
       // Reset after a delay
       setTimeout(() => {

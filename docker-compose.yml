@@ -18,6 +18,8 @@ services:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
       - ./alvaDescCLI:/app/backend/app/ml_models/alvaDescCLI
+    env_file:
+      - ./backend/.env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -41,11 +43,14 @@ services:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
       - ./alvaDescCLI:/app/backend/app/ml_models/alvaDescCLI
+    env_file:
+      - ./backend/.env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - MODEL_CLASSIFIER_PATH=/app/app/ml_models/model_mtb.json
     command: celery -A app.worker.celery_app worker --loglevel=debug
+    mem_limit: 2g
     depends_on:
       redis:
         condition: service_healthy

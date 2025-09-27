@@ -7,10 +7,11 @@ python-dotenv
 numpy
 rdkit
 scikit-learn
-xgboost
+
 joblib
 pydantic
 pydantic-settings
 pytest
 torch
 pandas
+xgboost==2.1.4
