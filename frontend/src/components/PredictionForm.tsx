@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import PredictionResults from './PredictionResults';
-import { SUBMIT_PREDICTION_JOB, SUBMIT_BATCH_PREDICTION_JOB, GET_PREDICTION_RESULT } from '@/lib/graphql/queries';
+import { SUBMIT_PREDICTION_JOB, GET_PREDICTION_RESULT, GET_JOB_STATUS } from '@/lib/graphql/queries';
 
-import type { PredictionResult, JobResponse, JobResult } from '@/lib/types'
+import type { PredictionResult, JobStatus, JobResult } from '@/lib/types'
 
 interface PredictionFormProps {
   initialSmiles?: string;
@@ -22,59 +22,72 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed'>('idle');
+  const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'error' | 'submitted'>('idle');
   const [progress, setProgress] = useState(0);
 
   // GraphQL hooks
-  const [submitPredictionJob] = useMutation(SUBMIT_PREDICTION_JOB);
-  const [submitBatchPredictionJob] = useMutation(SUBMIT_BATCH_PREDICTION_JOB);
-  const [getPredictionResult, { data: jobResult, stopPolling }] = useLazyQuery(GET_PREDICTION_RESULT, {
-    pollInterval: 2000,
+  const [submitPredictionJobMutation] = useMutation(SUBMIT_PREDICTION_JOB);
+  const [getJobStatus, { data: jobStatusData, startPolling: startStatusPolling, stopPolling: stopStatusPolling }] = useLazyQuery(GET_JOB_STATUS, {
+    pollInterval: 1000, // Poll every 1 second for job status
     errorPolicy: 'all',
   });
+  const [getPredictionResult, { data: predictionResultData }] = useLazyQuery(GET_PREDICTION_RESULT);
+
+  useEffect(() => {
+    if (currentJobId) {
+      getJobStatus({ variables: { jobId: currentJobId } });
+      startStatusPolling(1000);
+    }
+  }, [currentJobId, getJobStatus, startStatusPolling]);
 
   // Effect to handle job polling results
   useEffect(() => {
-    if (jobResult?.getPredictionResult) {
-      const result = jobResult.getPredictionResult as JobResult;
-      setJobStatus(result.status);
+    if (jobStatusData?.getJobStatus) {
+      const currentStatus = jobStatusData.getJobStatus as JobStatus;
+      setJobStatus(currentStatus.status);
       
-      if (result.status === 'processing') {
-        setProgress(prev => Math.min(prev + 10, 90)); // Simulate progress
-      } else if (result.status === 'completed') {
-        setProgress(100);
-        stopPolling();
-        
-        if (result.result) {
-          if (Array.isArray(result.result)) {
-            setResults(result.result);
-          } else {
-            setResults([result.result]);
-          }
+      // Update progress based on backend progress or simulate if not available
+      if (currentStatus.progress) {
+        // Assuming progress is a percentage string or can be parsed
+        const match = currentStatus.progress.match(/(\d+)%/);
+        if (match) {
+          setProgress(parseInt(match[1], 10));
+        } else if (currentStatus.status === 'processing') {
+          setProgress(prev => Math.min(prev + 5, 95)); // Simulate progress if no percentage
+        } else if (currentStatus.status === 'completed') {
+          setProgress(100);
         }
-        
-        // Reset after a delay
-        setTimeout(() => {
-          setJobStatus('idle');
-          setCurrentJobId(null);
-          setProgress(0);
-        }, 2000);
-      } else if (result.status === 'failed') {
-        setError(result.error || 'Prediction failed');
-        stopPolling();
+      }
+
+      if (currentStatus.status === 'completed') {
+        stopStatusPolling();
+        getPredictionResult({ variables: { jobId: currentStatus.jobId } }); // Fetch final results
+      } else if (currentStatus.status === 'failed' || currentStatus.status === 'cancelled') {
+        setError(currentStatus.error || 'Prediction failed');
+        stopStatusPolling();
         setJobStatus('idle');
         setCurrentJobId(null);
         setProgress(0);
       }
     }
-  }, [jobResult, stopPolling]);
+  }, [jobStatusData, stopStatusPolling, getPredictionResult]);
 
-  // Update input when initialSmiles changes
   useEffect(() => {
-    if (initialSmiles) {
-      setSmilesInput(initialSmiles);
+    if (predictionResultData?.getPredictionResult) {
+      const result = predictionResultData.getPredictionResult as JobResult;
+      console.log("Received predictionResultData:", result);
+      if (result.results) {
+        setResults(result.results);
+        console.log("Updated results state with:", result.results);
+      }
+      // Reset after a delay
+      setTimeout(() => {
+        setJobStatus('idle');
+        setCurrentJobId(null);
+        setProgress(0);
+      }, 2000);
     }
-  }, [initialSmiles]);
+  }, [predictionResultData]);
 
   const handleSinglePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,21 +96,18 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     setProgress(0);
     
     try {
-      const { data } = await submitPredictionJob({
-        variables: { smiles: smilesInput }
+      const { data } = await submitPredictionJobMutation({
+        variables: { jobInput: { smilesList: [smilesInput], jobName: 'Single Prediction' } }
       });
       
       if (data?.submitPredictionJob) {
-        const jobResponse = data.submitPredictionJob as JobResponse;
+                    const jobResponse = data.submitPredictionJob as JobStatus;
+        console.log("Job Response:", jobResponse);
         setCurrentJobId(jobResponse.jobId);
         setJobStatus('pending');
         setProgress(10);
-        
-        // Start polling for results
-        getPredictionResult({ variables: { jobId: jobResponse.jobId } });
       }
-    } catch (err) {
-      setError('Failed to submit prediction. Please try again.');
+            } catch (err) {      setError('Failed to submit prediction. Please try again.');
       setJobStatus('idle');
     }
   };
@@ -125,18 +135,16 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     }
 
     try {
-      const { data } = await submitBatchPredictionJob({
-        variables: { smilesStrings }
+      const { data } = await submitPredictionJobMutation({
+        variables: { jobInput: { smilesList: smilesStrings, jobName: 'Batch Prediction' } }
       });
       
-      if (data?.submitBatchPredictionJob) {
-        const jobResponse = data.submitBatchPredictionJob as JobResponse;
+      if (data?.submitPredictionJob) {
+        const jobResponse = data.submitPredictionJob as JobStatus;
+        console.log("Job Response:", jobResponse);
         setCurrentJobId(jobResponse.jobId);
         setJobStatus('pending');
         setProgress(10);
-        
-        // Start polling for results
-        getPredictionResult({ variables: { jobId: jobResponse.jobId } });
       }
     } catch (err) {
       setError('Failed to submit batch prediction. Please try again.');

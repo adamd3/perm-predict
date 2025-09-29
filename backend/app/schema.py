@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
-from app.worker import celery_app
+from app.celery_instance import celery_app
 from app.models import (
     MolecularDescriptors as MolecularDescriptorsModel,
     PredictionFeatures as PredictionFeaturesModel,
@@ -43,14 +43,9 @@ def convert_features_to_model(features_dict: Dict[str, Any]) -> Optional[Predict
     if not features_dict:
         return None
     
+    # Assuming features_dict['descriptors'] is now a list of floats
     descriptors = MolecularDescriptorsModel(
-        mol_wt=features_dict['descriptors']['MolWt'],
-        log_p=features_dict['descriptors']['LogP'],
-        tpsa=features_dict['descriptors']['TPSA'],
-        num_h_donors=features_dict['descriptors']['NumHDonors'],
-        num_h_acceptors=features_dict['descriptors']['NumHAcceptors'],
-        num_rotatable_bonds=features_dict['descriptors']['NumRotatableBonds'],
-        num_aromatic_rings=features_dict['descriptors']['NumAromaticRings']
+        alvadesc_features=features_dict['descriptors']['alvadesc_features']
     )
     
     return PredictionFeaturesModel(
@@ -121,6 +116,8 @@ class Query:
             # Retrieve job metadata from Redis
             try:
                 metadata = celery_app.backend.get(f"job_metadata:{job_id}")
+                if metadata:
+                    metadata = json.loads(metadata) # Manually deserialize from JSON string
                 created_at = metadata.get('created_at') if metadata else datetime.now().isoformat()
             except:
                 created_at = datetime.now().isoformat()
@@ -162,10 +159,15 @@ class Query:
                 error=f"Failed to get job status: {str(e)}"
             )
 
+from app.utils.logger import logger
+
+import json
+
 @strawberry.type
 class Mutation:
     @strawberry.field
     def submit_prediction_job(self, job_input: PredictionJobInput) -> JobStatus:
+
         """Submit a new prediction job and return the job ID."""
         try:
             # Validate input
@@ -189,15 +191,17 @@ class Mutation:
                     'job_name': job_input.job_name
                 }
             )
+
             
             # Store job metadata in Redis for timestamp tracking
+            metadata_to_store = {
+                'created_at': created_at,
+                'job_name': job_input.job_name,
+                'smiles_count': len(job_input.smiles_list)
+            }
             celery_app.backend.set(
                 f"job_metadata:{task.id}",
-                {
-                    'created_at': created_at,
-                    'job_name': job_input.job_name,
-                    'smiles_count': len(job_input.smiles_list)
-                }
+                json.dumps(metadata_to_store) # Manually serialize to JSON string
             )
             
             return JobStatusModel(
@@ -212,7 +216,7 @@ class Mutation:
                 job_id="",
                 status='error',
                 created_at=datetime.now().isoformat(),
-                error=f"Failed to submit job: {str(e)}"
+                error=str(e)
             )
 
 schema = strawberry.Schema(

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:alpine
@@ -12,19 +10,20 @@ services:
       retries: 3
 
   api:
+    platform: linux/amd64
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+      context: .
+      dockerfile: ./backend/Dockerfile
     volumes:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
+      - ./alvaDescCLI:/app/backend/app/ml_models/alvaDescCLI
+    env_file:
+      - ./backend/.env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MODEL_CLASSIFIER_PATH=/app/app/ml_models/classifier_model.pkl
-      - MODEL_REGRESSOR_PATH=/app/app/ml_models/regressor_model.pkl
+      - MODEL_CLASSIFIER_PATH=/app/app/ml_models/model_mtb.json
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     depends_on:
       redis:
@@ -36,18 +35,22 @@ services:
       retries: 3
 
   worker:
+    platform: linux/amd64
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     volumes:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
+      - ./alvaDescCLI:/app/backend/app/ml_models/alvaDescCLI
+    env_file:
+      - ./backend/.env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MODEL_CLASSIFIER_PATH=/app/app/ml_models/classifier_model.pkl
-      - MODEL_REGRESSOR_PATH=/app/app/ml_models/regressor_model.pkl
-    command: celery -A app.worker.celery_app worker --loglevel=info
+      - MODEL_CLASSIFIER_PATH=/app/app/ml_models/model_mtb.json
+    command: celery -A app.worker.celery_app worker --loglevel=debug
+    mem_limit: 2g
     depends_on:
       redis:
         condition: service_healthy
@@ -56,10 +59,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - BACKEND_URL=http://api:8000
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_GRAPHQL_ENDPOINT=http://localhost:8000/graphql
+      - NEXT_PUBLIC_GRAPHQL_ENDPOINT=http://api:8000/graphql
       - BACKEND_URL=http://api:8000
     depends_on:
       api:

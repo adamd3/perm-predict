@@ -24,4 +24,7 @@ EOL
 .DS_Store
 Thumbs.db
 
-get_tree.sh
+# get_tree.sh
+
+CLAUDE_OLD_md.txt
+GEMINI.md

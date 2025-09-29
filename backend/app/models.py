@@ -4,17 +4,13 @@ from datetime import datetime
 
 
 class MolecularDescriptors(BaseModel):
-    mol_wt: float = Field(..., description="Molecular weight")
-    log_p: float = Field(..., description="LogP (octanol-water partition coefficient)")
-    tpsa: float = Field(..., description="Topological polar surface area")
-    num_h_donors: int = Field(..., description="Number of hydrogen bond donors")
-    num_h_acceptors: int = Field(..., description="Number of hydrogen bond acceptors")
-    num_rotatable_bonds: int = Field(..., description="Number of rotatable bonds")
-    num_aromatic_rings: int = Field(..., description="Number of aromatic rings")
+    # Changed to store a raw list of alvaDesc features
+    alvadesc_features: List[float] = Field(..., description="Raw alvaDesc molecular descriptors")
 
 
 class PredictionFeatures(BaseModel):
-    morgan_fingerprint: List[int] = Field(..., description="Morgan fingerprint bit vector")
+    morgan_fingerprint: List[float] = Field(..., description="Morgan fingerprint bit vector")
+    # Changed to use the simplified MolecularDescriptors model
     descriptors: MolecularDescriptors = Field(..., description="Molecular descriptors")
 
 
