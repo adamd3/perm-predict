@@ -67,7 +67,9 @@ def load_mock_descriptors_from_tsv(file_path):
                 full_df[desc_name] = 0.0
 
         # Drop any extra columns that are not in ALVADESC_DESCRIPTOR_NAMES
-        extra_cols_in_mock = [col for col in full_df.columns if col not in ALVADESC_DESCRIPTOR_NAMES and col != SMILES_COLUMN_NAME]
+        extra_cols_in_mock = [
+            col for col in full_df.columns if col not in ALVADESC_DESCRIPTOR_NAMES and col != SMILES_COLUMN_NAME
+        ]
         if extra_cols_in_mock:
             print(f"Warning: Extra columns in mock data from TSV: {extra_cols_in_mock}. Dropping them.")
             full_df = full_df.drop(columns=extra_cols_in_mock)
@@ -76,7 +78,9 @@ def load_mock_descriptors_from_tsv(file_path):
         full_df = full_df[ALVADESC_DESCRIPTOR_NAMES]
 
         mock_tsv_data_cache = full_df
-        print(f"Successfully loaded {len(mock_tsv_data_cache)} rows from TSV with {len(ALVADESC_DESCRIPTOR_NAMES)} alvaDesc features.")
+        print(
+            f"Successfully loaded {len(mock_tsv_data_cache)} rows from TSV with {len(ALVADESC_DESCRIPTOR_NAMES)} alvaDesc features."
+        )
         return mock_tsv_data_cache
     except FileNotFoundError:
         print(f"Error: Mock TSV file not found at {file_path}")
@@ -122,7 +126,9 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
 
     # --- Generate Morgan Fingerprints ---
     morgan_fps = [smiles_to_morgan_fp(s, n_bits=MORGAN_FINGERPRINT_COUNT) for s in smiles_list]
-    morgan_df = pd.DataFrame(morgan_fps, columns=[f"fp_{i}" for i in range(MORGAN_FINGERPRINT_COUNT)], index=smiles_list)
+    morgan_df = pd.DataFrame(
+        morgan_fps, columns=[f"fp_{i}" for i in range(MORGAN_FINGERPRINT_COUNT)], index=smiles_list
+    )
 
     # --- Generate alvaDesc Descriptors ---
     alva_desc_df = pd.DataFrame(index=smiles_list)
@@ -138,7 +144,7 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
         alva_desc_rows = []
         for smiles in smiles_list:
             if smiles not in mock_data.index:
-                print(f"DEBUG: SMILES '{smiles}' not found in mock_data.index. Raising ValueError.") # New line
+                print(f"DEBUG: SMILES '{smiles}' not found in mock_data.index. Raising ValueError.")  # New line
                 raise ValueError("SMILES string must be in the example set.")
             alva_desc_rows.append(mock_data.loc[smiles])
 
@@ -160,7 +166,7 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
 
             if not alva_desc_client.calculate_descriptors(ALVADESC_DESCRIPTOR_NAMES):
                 error_msg = alva_desc_client.get_error()
-                # print(f"Error calculating alvaDesc descriptors: {error_msg}") # Suppress error message for local testing
+                print(f"Error calculating alvaDesc descriptors: {error_msg}") # Suppress error message for local testing
                 # Fill with zeros if alvaDesc fails due to licensing
                 alva_desc_data = np.full((len(smiles_list), len(ALVADESC_DESCRIPTOR_NAMES)), 0.0)
                 alva_desc_df = pd.DataFrame(alva_desc_data, columns=ALVADESC_DESCRIPTOR_NAMES, index=smiles_list)
@@ -170,6 +176,7 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
 
                 if alva_desc_output and alva_desc_output_names:
                     alva_desc_df = pd.DataFrame(alva_desc_output, columns=alva_desc_output_names, index=smiles_list)
+                    print(f"Head of alvaDesc output DataFrame:\n{alva_desc_df.head()}")
                     # Ensure all expected descriptors are present, fill missing with NaN
                     for desc_name in ALVADESC_DESCRIPTOR_NAMES:
                         if desc_name not in alva_desc_df.columns:
