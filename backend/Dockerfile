@@ -45,6 +45,7 @@ COPY ./backend/app/ml_models/model_mtb.json ./app/ml_models/model_mtb.json
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
 COPY full_feature_names.json /app/full_feature_names.json
 COPY desc_smiles.tsv /app/desc_smiles.tsv
+COPY alvaDesc_license.alic /app/alvaDesc_license.alic
 
 EXPOSE 8000
 
