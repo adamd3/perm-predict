@@ -42,17 +42,17 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
-              <TableHead className="w-[300px]">SMILES</TableHead>
+              <TableHead className="w-[350px]">SMILES</TableHead>
               <TableHead className="w-[150px]">Prediction</TableHead>
-              <TableHead className="w-[120px]">Permeant Probability</TableHead>
+              <TableHead className="w-[120px]">Permeant Score</TableHead>
               <TableHead className="w-[200px]">Confidence</TableHead>
-              <TableHead className="w-[120px]">Error</TableHead>
+              <TableHead className="w-[120px]">Status/Error</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {results.map((result, index) => (
               <TableRow key={index} className="hover:bg-gray-50">
-                <TableCell className="font-mono text-sm break-all max-w-[300px]">
+                <TableCell className="font-mono text-sm break-all max-w-[350px]">
                   {result.smiles}
                 </TableCell>
                 <TableCell>
@@ -65,13 +65,13 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                   )}
                 </TableCell>
                 <TableCell className="font-semibold">
-                  {result.error ? '—' : `${(result.confidence * 100).toFixed(1)}%`}
+                  {result.error ? '—' : `${(result.permeantProbability * 100).toFixed(1)}%`}
                 </TableCell>
                 <TableCell>
                   {result.error ? '—' : (
                     <div className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span>Confidence</span>
+                        <span>Overall Confidence</span>
                         <span className="font-medium">{(result.confidence * 100).toFixed(1)}%</span>
                       </div>
                       <Progress 
@@ -82,7 +82,7 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-red-600">
-                  {result.error || '—'}
+                  {result.error || 'Success'}
                 </TableCell>
               </TableRow>
             ))}

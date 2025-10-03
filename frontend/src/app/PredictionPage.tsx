@@ -3,6 +3,13 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Palette } from 'lucide-react';
 import Link from 'next/link';
 import PredictionForm from '@/components/PredictionForm';
@@ -19,26 +26,32 @@ function PredictionPageComponent() {
   }, [searchParams]);
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8">
+    <main className="min-h-screen bg-gray-950 py-16">
       <div className="container mx-auto p-4 max-w-4xl">
-        {/* Header with navigation */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Perm-Predict
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Advanced machine learning-based prediction of chemical accumulation in bacteria
-          </p>
-          
-          <Link href="/editor">
-            <Button variant="outline" className="flex items-center gap-2 mx-auto">
-              <Palette className="w-4 h-4" />
-              Open Chemical Structure Editor
-            </Button>
-          </Link>
-        </div>
+        <Card className="mb-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800">
+          <CardHeader className="text-center">
+            <CardTitle className="text-6xl font-extrabold text-blue-300 mb-4">
+              Perm-Predict
+            </CardTitle>
+            <CardDescription className="text-2xl text-gray-400 mb-8">
+              Advanced machine learning-based prediction of chemical accumulation in bacteria
+            </CardDescription>
+          </CardHeader>
+        </Card>
         
-        <PredictionForm initialSmiles={initialSmiles} />
+        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800">
+          <CardHeader>
+            <CardTitle className="text-4xl font-bold text-blue-300">
+              Predict Permeability
+            </CardTitle>
+            <CardDescription className="text-lg text-gray-400">
+              Enter a SMILES string below to predict its permeance in bacterial cells.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PredictionForm initialSmiles={initialSmiles} />
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

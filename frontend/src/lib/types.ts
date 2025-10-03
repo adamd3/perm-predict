@@ -20,6 +20,7 @@ export interface PredictionResult {
   smiles: string;
   prediction: number; // Predicted permeability value (float from backend, but we'll display binary)
   confidence: number; // Model confidence score
+  permeantProbability: number; // Probability of being permeant (prob_1)
   uncertainty?: number; // Prediction uncertainty from ensemble variance
   ensembleStd?: number; // Standard deviation of ensemble predictions
   classifierPrediction: number; // Binary classifier prediction (0 or 1)

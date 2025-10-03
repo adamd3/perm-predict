@@ -77,8 +77,12 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
       const result = predictionResultData.getPredictionResult as JobResult;
       console.log("Received predictionResultData:", result);
       if (result.results) {
-        setResults(result.results);
-        console.log("Updated results state with:", result.results);
+        const processedResults = result.results.map(pr => ({
+          ...pr,
+          permeantProbability: pr.classProbabilities && pr.classProbabilities.length > 1 ? pr.classProbabilities[1] : 0,
+        }));
+        setResults(processedResults);
+        console.log("Updated results state with:", processedResults);
       }
       // Reset after a delay
       setTimeout(() => {
@@ -184,25 +188,14 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Chemical Permeability Prediction
-            {getStatusIcon()}
-          </CardTitle>
-          <CardDescription>
-            Enter SMILES notation to predict compound permeability using machine learning
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="single" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="single">Single Prediction</TabsTrigger>
-              <TabsTrigger value="batch">Batch Prediction</TabsTrigger>
-            </TabsList>
+    <>
+      <Tabs defaultValue="single" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="single">Single Prediction</TabsTrigger>
+          <TabsTrigger value="batch">Batch Prediction</TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="single" className="space-y-4">
+            <TabsContent value="single" className="space-y-4 mt-4">
               <form onSubmit={handleSinglePrediction} className="space-y-4">
                 <div>
                   <Input
@@ -226,56 +219,54 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
               </form>
             </TabsContent>
 
-            <TabsContent value="batch" className="space-y-4">
+            <TabsContent value="batch" className="space-y-4 mt-4">
               <form onSubmit={handleBatchPrediction} className="space-y-4">
                 <div>
                   <textarea
                     placeholder="Enter multiple SMILES strings (one per line or comma-separated)..."
                     value={batchInput}
                     onChange={(e) => setBatchInput(e.target.value)}
-                    className="w-full min-h-[120px] p-3 border border-gray-300 rounded-md font-mono text-sm resize-vertical focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono resize-vertical"
                     disabled={isProcessing}
                   />
                 </div>
-                <Button type="submit" disabled={isProcessing || !batchInput.trim()} className="w-full">
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing Batch...
-                    </>
-                  ) : (
-                    'Predict Batch'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+            <Button type="submit" disabled={isProcessing || !batchInput.trim()} className="w-full">
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing Batch...
+                </>
+              ) : (
+                'Predict Batch'
+              )}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
 
-          {/* Progress indicator */}
-          {isProcessing && (
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  {getStatusIcon()}
-                  {getStatusText()}
-                </span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="w-full" />
-            </div>
-          )}
+      {/* Progress indicator */}
+      {isProcessing && (
+        <div className="mt-6 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              {getStatusIcon()}
+              {getStatusText()}
+            </span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
+        </div>
+      )}
 
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      {error && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-          {results.length > 0 && <PredictionResults results={results} />}
-        </CardContent>
-      </Card>
-    </div>
+      {results.length > 0 && <PredictionResults results={results} />}
+    </>
   );
 };
 

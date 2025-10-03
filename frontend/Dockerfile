@@ -9,14 +9,7 @@ COPY package*.json ./
 
 RUN npm install
 
-COPY src ./src
-COPY public ./public
-COPY next.config.ts .
-COPY tsconfig.json .
-COPY postcss.config.mjs .
-COPY tailwind.config.ts .
-COPY components.json .
-COPY eslint.config.mjs .
+COPY . .
 
 RUN npm run build
 
