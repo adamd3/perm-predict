@@ -30,6 +30,10 @@ export const GET_PREDICTION_RESULT = gql`
         features {
           __typename
         }
+        featuresSummary {
+          name
+          value
+        }
         error
         __typename
       }

@@ -18,10 +18,6 @@ FROM python:3.8 AS backend_runner
 
 WORKDIR /app
 
-# Create a non-root user and switch to it
-RUN adduser --system --group appuser
-USER appuser
-
 # Install system dependencies for RDKit and curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -30,6 +26,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user and switch to it
+RUN adduser --system --group appuser
+USER appuser
+
+# Temporarily switch back to root to change ownership of /app
+USER root
+RUN chown -R appuser:appuser /app
+RUN python -m venv /app/venv
+RUN chown -R appuser:appuser /app/venv
+USER appuser
+
+# Create a temporary directory for venv/pip operations
+RUN mkdir -p /app/tmp
+
+
 # Copy alvaDescCLI executable from the build context (project root)
 COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
 
@@ -37,11 +48,12 @@ COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
 # This assumes alvadesccliwrapper is installed in site-packages
 # We need to find the exact path in the mamba environment
 # For now, let's assume a common path, but this might need adjustment
-COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper /usr/local/lib/python3.8/site-packages/alvadesccliwrapper
-COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper-*.egg-info /usr/local/lib/python3.8/site-packages/
+COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper /app/venv/lib/python3.8/site-packages/alvadesccliwrapper
+COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper-*.egg-info /app/venv/lib/python3.8/site-packages/
 
 COPY ./backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies into the virtual environment
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY ./backend/app ./app
 
@@ -56,4 +68,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

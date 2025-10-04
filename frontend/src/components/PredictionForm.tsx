@@ -248,7 +248,7 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
       {isProcessing && (
         <div className="mt-6 space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-white">
               {getStatusIcon()}
               {getStatusText()}
             </span>

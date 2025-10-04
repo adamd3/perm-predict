@@ -4,6 +4,7 @@ import os
 import json
 import random
 import redis
+from typing import Optional
 from alvadesccliwrapper.alvadesc import AlvaDesc
 
 try:
@@ -57,7 +58,7 @@ except redis.exceptions.ConnectionError as e:
     print(f"Could not connect to Redis: {e}. Caching will be disabled.")
     redis_client = None
 
-def get_cached_features(smiles_string: str) -> pd.DataFrame | None:
+def get_cached_features(smiles_string: str) -> Optional[pd.DataFrame]:
     if redis_client is None:
         return None
     try:

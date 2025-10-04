@@ -9,6 +9,13 @@ COPY package*.json ./
 
 RUN npm install
 
+# Create the public directory
+RUN mkdir -p ./public
+
+# Move RDKit WASM and JS files from node_modules to the public directory
+RUN cp node_modules/@rdkit/rdkit/dist/RDKit_minimal.wasm ./public/RDKit_minimal.wasm
+RUN cp node_modules/@rdkit/rdkit/dist/RDKit_minimal.js ./public/RDKit_minimal.js
+
 COPY . .
 
 RUN npm run build

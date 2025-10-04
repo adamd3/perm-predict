@@ -27,6 +27,7 @@ export interface PredictionResult {
   ensemblePredictions?: number[]; // Individual ensemble model predictions
   classProbabilities: number[]; // Probabilities for each class [prob_0, prob_1]
   features?: PredictionFeatures; // Extracted molecular features
+  featuresSummary?: { [key: string]: number }; // Summary of key molecular features
   error?: string; // Error message if prediction failed
 }
 

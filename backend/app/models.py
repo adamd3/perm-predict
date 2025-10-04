@@ -14,6 +14,10 @@ class PredictionFeatures(BaseModel):
     descriptors: MolecularDescriptors = Field(..., description="Molecular descriptors")
 
 
+class FeatureSummaryItem(BaseModel):
+    name: str
+    value: float
+
 class PredictionResult(BaseModel):
     smiles: str = Field(..., description="Input SMILES string")
     prediction: float = Field(..., description="Predicted permeability value")
@@ -23,6 +27,7 @@ class PredictionResult(BaseModel):
     classifier_prediction: int = Field(..., description="Binary classifier prediction (0 or 1)")
     ensemble_predictions: Optional[List[float]] = Field(None, description="Individual ensemble model predictions")
     features: Optional[PredictionFeatures] = Field(None, description="Extracted molecular features")
+    features_summary: Optional[List[FeatureSummaryItem]] = Field(None, description="Summary of key molecular features")
     error: Optional[str] = Field(None, description="Error message if prediction failed")
 
 

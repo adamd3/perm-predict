@@ -143,6 +143,23 @@ def predict_permeability(
                     "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()}
                 }
 
+                # Extract key features for summary
+                features_summary = {}
+                summary_feature_names = ["MW", "LogP", "HBD", "HBA", "TPSA", "NumRotatableBonds"] # Common features
+                
+                for sf_name in summary_feature_names:
+                    try:
+                        # Find the index of the feature name in FULL_FEATURE_NAMES
+                        # This assumes FULL_FEATURE_NAMES is a list of strings
+                        feature_index = FULL_FEATURE_NAMES.index(sf_name)
+                        features_summary[sf_name] = float(feature_vector[0, feature_index])
+                    except ValueError:
+                        logger.warning(f"Summary feature '{sf_name}' not found in FULL_FEATURE_NAMES.")
+                        features_summary[sf_name] = 0.0 # Default or handle as appropriate
+                    except IndexError:
+                        logger.warning(f"Index error for summary feature '{sf_name}'. Feature vector might be too small.")
+                        features_summary[sf_name] = 0.0 # Default or handle as appropriate
+
                 logger.info(f"Feature vector shape: {feature_vector.shape}")
                 logger.info("Attempting classification prediction...")
                 # Classification prediction
@@ -187,6 +204,7 @@ def predict_permeability(
                             "class_probabilities": [0.5, 0.5],
                             "classifier_prediction": 0,
                             "features": processed_features_for_result,
+                            "features_summary": {}, # Add empty features_summary on error
                             "error": f"XGBoost prediction failed: {str(xgb_e)}",
                         }
                         results.append(result)
@@ -210,7 +228,8 @@ def predict_permeability(
                     "uncertainty": confidence_stats["uncertainty"],
                     "class_probabilities": confidence_stats["class_probabilities"],
                     "classifier_prediction": int(classifier_pred),
-                    "features": processed_features_for_result,  # Use the updated features
+                    "features": processed_features_for_result,
+                    "features_summary": features_summary,
                     "error": None,
                 }
 
@@ -224,6 +243,7 @@ def predict_permeability(
                     "class_probabilities": [0.5, 0.5],
                     "classifier_prediction": 0,
                     "features": processed_features_for_result,
+                    "features_summary": {}, # Add empty features_summary on error
                     "error": str(e),
                 }
             results.append(result)

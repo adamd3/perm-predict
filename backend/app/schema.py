@@ -11,7 +11,8 @@ from app.models import (
     PredictionResult as PredictionResultModel,
     JobResult as JobResultModel,
     JobStatus as JobStatusModel,
-    PredictionJobInput as PredictionJobInputModel
+    PredictionJobInput as PredictionJobInputModel,
+    FeatureSummaryItem as FeatureSummaryItemModel # Import the Pydantic model
 )
 
 @pydantic.type(model=MolecularDescriptorsModel, all_fields=True)
@@ -22,9 +23,24 @@ class MolecularDescriptors:
 class PredictionFeatures:
     pass
 
-@pydantic.type(model=PredictionResultModel, all_fields=True)
+# Define a custom Strawberry type for the features_summary dictionary
+@strawberry.type
+class FeatureSummaryItem:
+    name: str
+    value: float
+
+@pydantic.type(model=PredictionResultModel)
 class PredictionResult:
-    pass
+    smiles: str
+    prediction: float
+    confidence: float
+    uncertainty: Optional[float]
+    ensemble_std: Optional[float]
+    classifier_prediction: int
+    ensemble_predictions: Optional[List[float]]
+    features: Optional[PredictionFeatures]
+    features_summary: Optional[List[FeatureSummaryItem]]
+    error: Optional[str]
 
 @pydantic.type(model=JobResultModel, all_fields=True)
 class JobResult:
@@ -73,6 +89,13 @@ class Query:
                 prediction_results = []
                 for r in result.get('results', []):
                     features = convert_features_to_model(r.get('features'))
+                    
+                    # Convert features_summary dict to list of FeatureSummaryItem
+                    features_summary_list = []
+                    if r.get('features_summary'):
+                        for name, value in r['features_summary'].items():
+                            features_summary_list.append(FeatureSummaryItemModel(name=name, value=value))
+
                     prediction_results.append(
                         PredictionResultModel(
                             smiles=r['smiles'],
@@ -80,6 +103,7 @@ class Query:
                             confidence=r['confidence'],
                             classifier_prediction=r['classifier_prediction'],
                             features=features,
+                            features_summary=features_summary_list, # Assign the converted list
                             error=r.get('error')
                         )
                     )
