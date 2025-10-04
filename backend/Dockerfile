@@ -18,6 +18,10 @@ FROM python:3.8 AS backend_runner
 
 WORKDIR /app
 
+# Create a non-root user and switch to it
+RUN adduser --system --group appuser
+USER appuser
+
 # Install system dependencies for RDKit and curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
