@@ -90,11 +90,8 @@ class Query:
                 for r in result.get('results', []):
                     features = convert_features_to_model(r.get('features'))
                     
-                    # Convert features_summary dict to list of FeatureSummaryItem
-                    features_summary_list = []
-                    if r.get('features_summary'):
-                        for name, value in r['features_summary'].items():
-                            features_summary_list.append(FeatureSummaryItemModel(name=name, value=value))
+                    # features_summary is already a list of FeatureSummaryItem from the worker
+                    features_summary_list = r.get('features_summary', [])
 
                     prediction_results.append(
                         PredictionResultModel(

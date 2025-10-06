@@ -145,7 +145,7 @@ def predict_permeability(
 
                 # Extract key features for summary
                 features_summary = {}
-                summary_feature_names = ["MW", "LogP", "HBD", "HBA", "TPSA", "NumRotatableBonds"] # Common features
+                summary_feature_names = ["MW", "ALOGP", "nHDon", "TPSA"] # Common features
                 
                 for sf_name in summary_feature_names:
                     try:
@@ -204,7 +204,7 @@ def predict_permeability(
                             "class_probabilities": [0.5, 0.5],
                             "classifier_prediction": 0,
                             "features": processed_features_for_result,
-                            "features_summary": {}, # Add empty features_summary on error
+                            "features_summary": [], # Add empty features_summary on error
                             "error": f"XGBoost prediction failed: {str(xgb_e)}",
                         }
                         results.append(result)
@@ -215,6 +215,13 @@ def predict_permeability(
                     classifier_pred = 0
                     confidence_stats = {"confidence": 0.0, "uncertainty": 1.0, "class_probabilities": [0.5, 0.5]}
                     logger.warning("No classifier model available - defaulting to non-permeant")
+
+                # Convert features_summary dictionary to a list of objects for frontend consumption
+                features_summary_list = []
+                for name, value in features_summary.items():
+                    features_summary_list.append({"name": name, "value": value})
+
+                logger.info(f"Features summary list being sent to frontend: {features_summary_list}")
 
                 logger.info("Classification prediction completed.")
 
@@ -229,7 +236,7 @@ def predict_permeability(
                     "class_probabilities": confidence_stats["class_probabilities"],
                     "classifier_prediction": int(classifier_pred),
                     "features": processed_features_for_result,
-                    "features_summary": features_summary,
+                    "features_summary": features_summary_list,
                     "error": None,
                 }
 
@@ -243,7 +250,7 @@ def predict_permeability(
                     "class_probabilities": [0.5, 0.5],
                     "classifier_prediction": 0,
                     "features": processed_features_for_result,
-                    "features_summary": {}, # Add empty features_summary on error
+                    "features_summary": [], # Add empty features_summary on error
                     "error": str(e),
                 }
             results.append(result)
