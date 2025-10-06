@@ -17,14 +17,25 @@ const MoleculeViewer = dynamic(() => import('./MoleculeViewer'), {
 });
 
 import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, LogarithmicScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
+import ChartModal from './ChartModal';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, LogarithmicScale, BarElement, Title, Tooltip, Legend);
 
 import type { PredictionResultsProps, FeatureSummaryItem } from '@/lib/types'
 
 const PredictionResults = ({ results }: PredictionResultsProps) => {
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [modalChartData, setModalChartData] = React.useState<ChartData<'bar'> | null>(null);
+  const [modalChartTitle, setModalChartTitle] = React.useState('');
+
   if (!results.length) return null;
+
+  const handleChartClick = (result: any) => {
+    setModalChartData(getChartData(result.featuresSummary));
+    setModalChartTitle(`Feature Summary for ${result.smiles}`);
+    setIsModalOpen(true);
+  };
 
   const getPredictionBadge = (classifierPrediction: number) => {
     const isPermeant = classifierPrediction === 1;
@@ -57,7 +68,7 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
     };
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -72,7 +83,14 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
           minRotation: 90,
         }
       },
-      y: { ticks: { font: { size: 8 } } },
+      y: {
+        type: 'logarithmic',
+        ticks: { font: { size: 8 } },
+        title: {
+          display: true,
+          text: 'Log Value',
+        },
+      },
     },
   };
 
@@ -135,8 +153,11 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                   )}
                 </TableCell>
                 <TableCell className="max-w-[150px]">
-                  {!result.error && result.featuresSummary && Object.keys(result.featuresSummary).length > 0 ? (
-                    <div style={{ width: '100%', height: '100px' }}>
+                  {!result.error && result.featuresSummary && result.featuresSummary.length > 0 ? (
+                    <div 
+                      className="relative h-[100px] w-full cursor-pointer" 
+                      onClick={() => handleChartClick(result)}
+                    >
                       <Bar data={getChartData(result.featuresSummary)} options={chartOptions} />
                     </div>
                   ) : (
@@ -181,6 +202,14 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
           </div>
         </div>
       )}
+
+      <ChartModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        chartData={modalChartData}
+        chartOptions={chartOptions}
+        title={modalChartTitle}
+      />
     </div>
   );
 };
