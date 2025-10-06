@@ -65,7 +65,13 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
       title: { display: false },
     },
     scales: {
-      x: { ticks: { font: { size: 8 } } },
+      x: {
+        ticks: {
+          font: { size: 8 },
+          maxRotation: 90,
+          minRotation: 90,
+        }
+      },
       y: { ticks: { font: { size: 8 } } },
     },
   };
