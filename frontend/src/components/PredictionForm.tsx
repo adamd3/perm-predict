@@ -19,6 +19,16 @@ interface PredictionFormProps {
 const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
   const [smilesInput, setSmilesInput] = useState(initialSmiles);
   const [batchInput, setBatchInput] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+      setBatchInput(''); // Clear textarea if file is selected
+    } else {
+      setSelectedFile(null);
+    }
+  };
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -118,23 +128,33 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
 
   const handleBatchPrediction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchInput.trim()) {
-      setError('Please enter SMILES strings');
-      return;
-    }
-
     setError('');
     setResults([]);
     setProgress(0);
-    
-    // Parse SMILES strings (one per line or comma-separated)
-    const smilesStrings = batchInput
-      .split(/[\n,]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-      
+
+    let smilesStrings: string[] = [];
+
+    if (selectedFile) {
+      try {
+        const fileContent = await readFileContent(selectedFile);
+        smilesStrings = fileContent
+          .split(/\r?\n/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      } catch (readError) {
+        setError(`Failed to read file: ${readError instanceof Error ? readError.message : String(readError)}`);
+        setJobStatus('idle');
+        return;
+      }
+    } else if (batchInput.trim()) {
+      smilesStrings = batchInput
+        .split(/[\n,]/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+    }
+
     if (smilesStrings.length === 0) {
-      setError('No valid SMILES strings found');
+      setError('No valid SMILES strings found. Please enter them manually or upload a file.');
       return;
     }
 
@@ -154,6 +174,23 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
       setError('Failed to submit batch prediction. Please try again.');
       setJobStatus('idle');
     }
+  };
+
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && typeof event.target.result === 'string') {
+          resolve(event.target.result);
+        } else {
+          reject(new Error('Failed to read file content.'));
+        }
+      };
+      reader.onerror = (event) => {
+        reject(event.target?.error || new Error('Error reading file.'));
+      };
+      reader.readAsText(file);
+    });
   };
 
   const getStatusIcon = () => {
@@ -221,16 +258,43 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
 
             <TabsContent value="batch" className="space-y-4 mt-4">
               <form onSubmit={handleBatchPrediction} className="space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <label htmlFor="smiles-file" className="text-sm font-medium leading-none">Upload SMILES File (one per line)</label>
+                  <div className="flex w-full items-center space-x-2">
+                    <Input
+                      id="smiles-file"
+                      type="file"
+                      accept=".txt,.smi,.csv"
+                      onChange={handleFileChange}
+                      className="w-full"
+                      disabled={isProcessing}
+                    />
+                    {selectedFile && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSelectedFile(null)}
+                        disabled={isProcessing}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">Or enter manually below:</span>
+                </div>
                 <div>
                   <textarea
                     placeholder="Enter multiple SMILES strings (one per line or comma-separated)..."
                     value={batchInput}
-                    onChange={(e) => setBatchInput(e.target.value)}
+                    onChange={(e) => {
+                      setBatchInput(e.target.value);
+                      setSelectedFile(null); // Clear selected file if user starts typing
+                    }}
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono resize-vertical"
-                    disabled={isProcessing}
+                    disabled={isProcessing || selectedFile !== null}
                   />
                 </div>
-            <Button type="submit" disabled={isProcessing || !batchInput.trim()} className="w-full">
+            <Button type="submit" disabled={isProcessing || (!batchInput.trim() && !selectedFile)} className="w-full">
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
