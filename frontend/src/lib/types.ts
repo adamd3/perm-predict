@@ -16,6 +16,11 @@ export interface PredictionFeatures {
   alvadescFeatureVector?: number[];
 }
 
+export interface FeatureSummaryItem {
+  name: string;
+  value: number;
+}
+
 export interface PredictionResult {
   smiles: string;
   prediction: number; // Predicted permeability value (float from backend, but we'll display binary)
@@ -27,7 +32,7 @@ export interface PredictionResult {
   ensemblePredictions?: number[]; // Individual ensemble model predictions
   classProbabilities: number[]; // Probabilities for each class [prob_0, prob_1]
   features?: PredictionFeatures; // Extracted molecular features
-  featuresSummary?: { [key: string]: number }; // Summary of key molecular features
+  featuresSummary?: FeatureSummaryItem[]; // Summary of key molecular features
   error?: string; // Error message if prediction failed
 }
 

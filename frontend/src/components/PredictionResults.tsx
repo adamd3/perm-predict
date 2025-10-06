@@ -21,7 +21,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-import type { PredictionResultsProps } from '@/lib/types'
+import type { PredictionResultsProps, FeatureSummaryItem } from '@/lib/types'
 
 const PredictionResults = ({ results }: PredictionResultsProps) => {
   if (!results.length) return null;
@@ -39,9 +39,9 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
     );
   };
 
-  const getChartData = (featuresSummary: { [key: string]: number }) => {
-    const labels = Object.keys(featuresSummary);
-    const data = Object.values(featuresSummary);
+  const getChartData = (featuresSummary: FeatureSummaryItem[]) => {
+    const labels = featuresSummary.map(item => item.name);
+    const data = featuresSummary.map(item => item.value);
 
     return {
       labels,
