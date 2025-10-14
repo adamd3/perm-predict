@@ -12,7 +12,7 @@ export default function ExplorePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
       <main className="flex flex-col items-center justify-center w-full flex-1 px-4 sm:px-20 text-center">
-        <Card className="w-full max-w-4xl">
+        <Card className="w-full max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="text-3xl font-bold">Explore compound permeability</CardTitle>
             <CardDescription className="mt-2 text-lg">
