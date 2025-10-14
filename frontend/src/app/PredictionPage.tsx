@@ -28,18 +28,18 @@ function PredictionPageComponent() {
   return (
     <main className="min-h-screen bg-gray-950 py-16">
       <div className="container mx-auto p-4 max-w-6xl">
-        <Card className="mb-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800">
+        <Card className="mb-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800 max-w-2xl mx-auto">
           <CardHeader className="text-center">
             <CardTitle className="text-6xl font-extrabold text-blue-300 mb-4">
               Perm-Predict
             </CardTitle>
             <CardDescription className="text-2xl text-gray-400 mb-8">
-              Advanced machine learning-based prediction of chemical accumulation in bacteria
+              AI-based prediction of chemical accumulation in bacteria
             </CardDescription>
           </CardHeader>
         </Card>
         
-        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800">
+        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 border border-gray-700 bg-gray-800 max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="text-4xl font-bold text-blue-300">
               Predict Permeability
