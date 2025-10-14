@@ -126,6 +126,106 @@ class Query:
             return None
     
     @strawberry.field
+    def get_exploration_result(self, job_id: str) -> Optional[JobResult]:
+        """Get the result of an exploration job by job ID. Only returns results for completed jobs."""
+        try:
+            task = celery_app.AsyncResult(job_id)
+            
+            if not task:
+                return None
+            
+            if task.state == 'SUCCESS':
+                result = task.result
+                
+                prediction_results = []
+                for r in result.get('results', []):
+                    features = convert_features_to_model(r.get('features'))
+                    features_summary_list = r.get('features_summary', [])
+
+                    prediction_results.append(
+                        PredictionResultModel(
+                            smiles=r['smiles'],
+                            prediction=r['prediction'],
+                            confidence=r['confidence'],
+                            classifier_prediction=r['classifier_prediction'],
+                            features=features,
+                            features_summary=features_summary_list,
+                            error=r.get('error')
+                        )
+                    )
+                
+                return JobResultModel(
+                    status='completed',
+                    results=prediction_results,
+                    total_processed=result.get('total_processed', 0),
+                    successful=result.get('successful', 0),
+                    failed=result.get('failed', 0),
+                    job_id=job_id,
+                    created_at=result.get('created_at', datetime.now().isoformat()),
+                    completed_at=result.get('completed_at', datetime.now().isoformat())
+                )
+            
+            return None
+                
+        except Exception as e:
+            logger.error(f"Failed to retrieve exploration job result for {job_id}: {str(e)}")
+            return None
+    
+    @strawberry.field
+    def get_job_status(self, job_id: str) -> Optional[JobStatus]:
+        """Get the result of a prediction job by job ID. Only returns results for completed jobs."""
+        try:
+            # Get task result from Celery
+            task = celery_app.AsyncResult(job_id)
+            
+            if not task:
+                return None
+            
+            # Only return JobResult for successfully completed tasks
+            if task.state == 'SUCCESS':
+                result = task.result
+                
+                # Convert results to Pydantic models
+                prediction_results = []
+                for r in result.get('results', []):
+                    features = convert_features_to_model(r.get('features'))
+                    
+                    # features_summary is already a list of FeatureSummaryItem from the worker
+                    features_summary_list = r.get('features_summary', [])
+
+                    prediction_results.append(
+                        PredictionResultModel(
+                            smiles=r['smiles'],
+                            prediction=r['prediction'],
+                            confidence=r['confidence'],
+                            classifier_prediction=r['classifier_prediction'],
+                            features=features,
+                            features_summary=features_summary_list, # Assign the converted list
+                            error=r.get('error')
+                        )
+                    )
+                
+                return JobResultModel(
+                    status='completed',
+                    results=prediction_results,
+                    total_processed=result.get('total_processed', 0),
+                    successful=result.get('successful', 0),
+                    failed=result.get('failed', 0),
+                    job_id=job_id,
+                    created_at=result.get('created_at', datetime.now().isoformat()),
+                    completed_at=result.get('completed_at', datetime.now().isoformat())
+                )
+            
+            # For any other state (PENDING, PROGRESS, FAILURE), return None
+            # Clients should use get_job_status to check status
+            return None
+                
+        except Exception as e:
+            # Log the error but return None to maintain consistent return type
+            logger.error(f"Failed to retrieve job result for {job_id}: {str(e)}")
+            return None
+    
+    @strawberry.field
     def get_job_status(self, job_id: str) -> Optional[JobStatus]:
         """Get the current status of a prediction job."""
         try:
@@ -230,6 +330,54 @@ class Mutation:
                 status='submitted',
                 created_at=created_at,
                 progress=f"Job submitted with {len(job_input.smiles_list)} compounds"
+            )
+            
+        except Exception as e:
+            return JobStatusModel(
+                job_id="",
+                status='error',
+                created_at=datetime.now().isoformat(),
+                error=str(e)
+            )
+
+    @strawberry.field
+    def submit_exploration_job(self, job_input: PredictionJobInput) -> JobStatus:
+        """Submit a new exploration job and return the job ID."""
+        try:
+            if not job_input.smiles_list or len(job_input.smiles_list) != 1:
+                return JobStatusModel(
+                    job_id="",
+                    status='error',
+                    created_at=datetime.now().isoformat(),
+                    error="Exploration requires exactly one SMILES string."
+                )
+            
+            created_at = datetime.now().isoformat()
+            
+            task = celery_app.send_task(
+                'explore_permeability',
+                args=[job_input.smiles_list[0]], # Pass single SMILES string
+                kwargs={
+                    'created_at': created_at,
+                    'job_name': job_input.job_name
+                }
+            )
+            
+            metadata_to_store = {
+                'created_at': created_at,
+                'job_name': job_input.job_name,
+                'smiles_count': 1 # Always 1 for exploration
+            }
+            celery_app.backend.set(
+                f"job_metadata:{task.id}",
+                json.dumps(metadata_to_store)
+            )
+            
+            return JobStatusModel(
+                job_id=task.id,
+                status='submitted',
+                created_at=created_at,
+                progress=f"Exploration job submitted for {job_input.smiles_list[0]}"
             )
             
         except Exception as e:

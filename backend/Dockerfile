@@ -7,7 +7,7 @@ WORKDIR /tmp/alvadesc_build
 
 # Create mamba environment and install dependencies
 COPY alvaDescCLIWrapper ./alvaDescCLIWrapper
-RUN micromamba create -n alvadesc python=3.8 openjdk=11 -c conda-forge -c bioconda -c defaults && \
+RUN micromamba create -n alvadesc python=3.8 openjdk=11 rdkit -c conda-forge -c bioconda -c defaults && \
     micromamba run -n alvadesc bash -c " \
     cp -R alvaDescCLIWrapper/alvadesccliwrapper /opt/conda/envs/alvadesc/lib/python3.8/site-packages/ \
     " && \
