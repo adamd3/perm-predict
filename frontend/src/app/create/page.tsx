@@ -5,10 +5,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
-const DynamicJsmeEditor = dynamic(() => import('../../components/JsmeEditor'), {
-  ssr: false,
-  loading: () => <p>Loading editor...</p>,
-});
+const DynamicJsmeEditor = dynamic(() => import('../../components/JsmeEditor'), { ssr: false });
 
 export default function CreatePage() {
   const [smiles, setSmiles] = useState<string>('');

@@ -86,6 +86,9 @@ export default function RootLayout({
                   <Link href="/contact" className="hover:text-gray-700 dark:hover:text-gray-50">
                     Contact Us
                   </Link>
+                  <Link href="https://github.com/adamd3/perm-predict" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 dark:hover:text-gray-50">
+                    Source Code
+                  </Link>
                   {/* Placeholder images */}
                   <img src="/placeholder-1.svg" alt="Placeholder 1" className="h-6 w-6" />
                   <img src="/placeholder-2.svg" alt="Placeholder 2" className="h-6 w-6" />
