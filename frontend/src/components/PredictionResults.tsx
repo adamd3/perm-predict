@@ -97,8 +97,8 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
   return (
     <div className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Prediction Results</h3>
-        <div className="text-sm text-white">
+        <h3 className="text-lg font-semibold">Prediction Results</h3>
+        <div className="text-sm">
           {results.length} compound{results.length > 1 ? 's' : ''} analyzed
         </div>
       </div>
@@ -106,7 +106,7 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
       <div className="overflow-x-auto border rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50">
+            <TableRow>
               <TableHead className="w-[300px]">SMILES / Structure</TableHead>
               <TableHead className="w-[150px]">Prediction</TableHead>
               <TableHead className="w-[120px]">Permeant Score</TableHead>
@@ -117,7 +117,7 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
           </TableHeader>
           <TableBody>
             {results.map((result, index) => (
-              <TableRow key={index} className="bg-white hover:bg-gray-50">
+              <TableRow key={index}>
                 <TableCell className="font-mono text-sm break-all max-w-[300px]">
                   {result.smiles}
                   {!result.error && result.smiles && (

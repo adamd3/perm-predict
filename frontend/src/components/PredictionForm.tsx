@@ -14,9 +14,10 @@ import type { PredictionResult, JobStatus, JobResult } from '@/lib/types'
 
 interface PredictionFormProps {
   initialSmiles?: string;
+  onResultsLoaded?: (hasResults: boolean) => void;
 }
 
-const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
+const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormProps) => {
   const [smilesInput, setSmilesInput] = useState(initialSmiles);
   const [batchInput, setBatchInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -93,6 +94,9 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
         }));
         setResults(processedResults);
         console.log("Updated results state with:", processedResults);
+        if (onResultsLoaded) {
+          onResultsLoaded(processedResults.length > 0);
+        }
       }
       // Reset after a delay
       setTimeout(() => {
@@ -101,13 +105,16 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
         setProgress(0);
       }, 2000);
     }
-  }, [predictionResultData]);
+  }, [predictionResultData, onResultsLoaded]);
 
   const handleSinglePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setResults([]);
     setProgress(0);
+    if (onResultsLoaded) {
+      onResultsLoaded(false);
+    }
     
     try {
       const { data } = await submitPredictionJobMutation({
@@ -131,6 +138,9 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     setError('');
     setResults([]);
     setProgress(0);
+    if (onResultsLoaded) {
+      onResultsLoaded(false);
+    }
 
     let smilesStrings: string[] = [];
 

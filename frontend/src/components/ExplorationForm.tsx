@@ -14,9 +14,10 @@ import type { PredictionResult, JobStatus, JobResult } from '@/lib/types'
 
 interface ExplorationFormProps {
   initialSmiles?: string;
+  onResultsLoaded?: (hasResults: boolean) => void;
 }
 
-const ExplorationForm = ({ initialSmiles = '' }: ExplorationFormProps) => {
+const ExplorationForm = ({ initialSmiles = '', onResultsLoaded }: ExplorationFormProps) => {
   const [smilesInput, setSmilesInput] = useState(initialSmiles);
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
@@ -81,6 +82,9 @@ const ExplorationForm = ({ initialSmiles = '' }: ExplorationFormProps) => {
         }));
         setResults(processedResults);
         console.log("Updated results state with:", processedResults);
+        if (onResultsLoaded) {
+          onResultsLoaded(processedResults.length > 0);
+        }
       }
       // Reset after a delay
       setTimeout(() => {
@@ -89,13 +93,16 @@ const ExplorationForm = ({ initialSmiles = '' }: ExplorationFormProps) => {
         setProgress(0);
       }, 2000);
     }
-  }, [explorationResultData]);
+  }, [explorationResultData, onResultsLoaded]);
 
   const handleExplorationSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setResults([]);
     setProgress(0);
+    if (onResultsLoaded) {
+      onResultsLoaded(false);
+    }
     
     try {
       const { data } = await submitExplorationJobMutation({
@@ -148,7 +155,7 @@ const ExplorationForm = ({ initialSmiles = '' }: ExplorationFormProps) => {
 
   return (
     <>
-      <form onSubmit={handleExplorationSubmission} className="space-y-4">
+      <form onSubmit={handleExplorationSubmission} className="space-y-4 w-full">
         <div>
           <Input
             placeholder="Enter SMILES string (e.g., CCO for ethanol)..."

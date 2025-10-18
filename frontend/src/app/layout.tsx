@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function RootLayout({
   children,
@@ -43,7 +44,7 @@ export default function RootLayout({
                 <Link href="/" className="text-2xl font-bold">
                   Perm-Predict
                 </Link>
-                <ul className="flex space-x-8">
+                <ul className="flex space-x-8 items-center">
                   <li>
                     <Link href="/" className="hover:text-gray-700 dark:hover:text-gray-50">
                       Predict
@@ -68,6 +69,9 @@ export default function RootLayout({
                     <Link href="/about" className="hover:text-gray-700 dark:hover:text-gray-50">
                       About
                     </Link>
+                  </li>
+                  <li>
+                    <ThemeToggle />
                   </li>
                 </ul>
               </nav>

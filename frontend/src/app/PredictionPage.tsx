@@ -17,6 +17,7 @@ import PredictionForm from '@/components/PredictionForm';
 function PredictionPageComponent() {
   const searchParams = useSearchParams();
   const [initialSmiles, setInitialSmiles] = useState<string>('');
+  const [hasResults, setHasResults] = useState<boolean>(false);
 
   useEffect(() => {
     const smilesParam = searchParams.get('smiles');
@@ -27,7 +28,7 @@ function PredictionPageComponent() {
 
   return (
     <main className="min-h-screen py-16">
-      <div className="container mx-auto p-4 max-w-6xl">
+      <div className="container mx-auto p-4 max-w-full">
         <Card className="mb-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 max-w-2xl mx-auto">
           <CardHeader className="text-center">
             <CardTitle className="text-6xl font-extrabold mb-4 text-foreground dark:text-foreground">
@@ -39,7 +40,7 @@ function PredictionPageComponent() {
           </CardHeader>
         </Card>
         
-        <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 max-w-2xl mx-auto">
+        <Card className={`shadow-xl hover:shadow-2xl transition-shadow duration-300 ${hasResults ? 'w-full' : 'max-w-2xl'} mx-auto`}>
           <CardHeader>
             <CardTitle className="text-4xl font-bold text-foreground dark:text-foreground">
               Predict Permeability
@@ -49,7 +50,7 @@ function PredictionPageComponent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PredictionForm initialSmiles={initialSmiles} />
+            <PredictionForm initialSmiles={initialSmiles} onResultsLoaded={setHasResults} />
           </CardContent>
         </Card>
       </div>
