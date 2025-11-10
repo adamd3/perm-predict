@@ -37,12 +37,13 @@ RUN python -m venv /app/venv
 RUN chown -R appuser:appuser /app/venv
 USER appuser
 
+
+
 # Create a temporary directory for venv/pip operations
 RUN mkdir -p /app/tmp
 
 
-# Copy alvaDescCLI executable from the build context (project root)
-COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
+
 
 # Copy alvadesccliwrapper package from mamba_builder stage
 # This assumes alvadesccliwrapper is installed in site-packages
