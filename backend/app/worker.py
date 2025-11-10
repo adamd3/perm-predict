@@ -16,6 +16,8 @@ from app.models import PredictionFeatures, MolecularDescriptors  # Import Pydant
 from app.celery_instance import celery_app  # Import celery_app from the new instance file
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from rdkit.Chem import Descriptors
+from rdkit.Chem import Crippen
 
 
 # Removed global classifier_model and top-level load_models()
@@ -87,6 +89,10 @@ def predict_permeability(
         for smiles in smiles_list:
             processed_features_for_result = None  # Initialize here
             try:
+                mol = Chem.MolFromSmiles(smiles)
+                if not mol:
+                    raise ValueError(f"Invalid SMILES string: {smiles}")
+
                 # Extract features using alvaDesc CLI wrapper and Morgan fingerprints
                 logger.info(f"Generating features for SMILES: {smiles}")
                 logger.info(f"DEBUG: settings.MOCK_ALVADESC = {settings.MOCK_ALVADESC}")  # New line
@@ -145,22 +151,14 @@ def predict_permeability(
                     "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()}
                 }
 
-                # Extract key features for summary
-                features_summary = {}
-                summary_feature_names = ["MW", "ALOGP", "nHDon", "TPSA"] # Common features
-                
-                for sf_name in summary_feature_names:
-                    try:
-                        # Find the index of the feature name in FULL_FEATURE_NAMES
-                        # This assumes FULL_FEATURE_NAMES is a list of strings
-                        feature_index = FULL_FEATURE_NAMES.index(sf_name)
-                        features_summary[sf_name] = float(feature_vector[0, feature_index])
-                    except ValueError:
-                        logger.warning(f"Summary feature '{sf_name}' not found in FULL_FEATURE_NAMES.")
-                        features_summary[sf_name] = 0.0 # Default or handle as appropriate
-                    except IndexError:
-                        logger.warning(f"Index error for summary feature '{sf_name}'. Feature vector might be too small.")
-                        features_summary[sf_name] = 0.0 # Default or handle as appropriate
+                # Extract key features for summary using RDKit
+                features_summary = {
+                    "MW": Descriptors.MolWt(mol),
+                    "ALOGP": Crippen.MolLogP(mol),
+                    "nHDon": Descriptors.NumHDonors(mol),
+                    "TPSA": Descriptors.TPSA(mol),
+                }
+                logger.info(f"RDKit-derived summary features: {features_summary}")
 
                 logger.info(f"Feature vector shape: {feature_vector.shape}")
                 logger.info("Attempting classification prediction...")
