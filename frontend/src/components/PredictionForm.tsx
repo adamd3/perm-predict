@@ -45,6 +45,15 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
   const [getPredictionResult, { data: predictionResultData }] = useLazyQuery(GET_PREDICTION_RESULT);
 
   useEffect(() => {
+    if (initialSmiles && initialSmiles !== smilesInput && !isProcessing) {
+      setSmilesInput(initialSmiles);
+      // Automatically trigger prediction if initialSmiles is provided
+      // We need to simulate the event object for handleSinglePrediction
+      handleSinglePrediction({ preventDefault: () => {} } as React.FormEvent);
+    }
+  }, [initialSmiles, isProcessing]);
+
+  useEffect(() => {
     if (currentJobId) {
       getJobStatus({ variables: { jobId: currentJobId } });
       startStatusPolling(1000);
