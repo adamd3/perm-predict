@@ -36,6 +36,8 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
   const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'error' | 'submitted'>('idle');
   const [progress, setProgress] = useState(0);
 
+  const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
+
   // GraphQL hooks
   const [submitPredictionJobMutation] = useMutation(SUBMIT_PREDICTION_JOB);
   const [getJobStatus, { data: jobStatusData, startPolling: startStatusPolling, stopPolling: stopStatusPolling }] = useLazyQuery(GET_JOB_STATUS, {
@@ -241,7 +243,6 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
     }
   };
 
-  const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
 
   return (
     <>
