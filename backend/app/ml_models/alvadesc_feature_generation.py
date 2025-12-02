@@ -4,7 +4,7 @@ import os
 import json
 import random
 import redis
-from typing import Optional
+from typing import Optional, List
 from alvadesccliwrapper.alvadesc import AlvaDesc
 
 try:
@@ -86,7 +86,7 @@ def set_cached_features(smiles_string: str, features_df: pd.DataFrame):
     except Exception as e:
         print(f"Error storing to Redis cache for {smiles_string}: {e}")
 
-mock_tsv_data_cache = None
+mock_tsv_data_cache = {"df": None, "min_vals": None, "max_vals": None}
 
 
 def load_mock_descriptors_from_tsv(file_path):
@@ -96,7 +96,7 @@ def load_mock_descriptors_from_tsv(file_path):
     Caches the result for subsequent calls.
     """
     global mock_tsv_data_cache
-    if mock_tsv_data_cache is not None:
+    if mock_tsv_data_cache["df"] is not None:
         return mock_tsv_data_cache
 
     print(f"Loading mock data from TSV: {file_path}...")
@@ -121,19 +121,56 @@ def load_mock_descriptors_from_tsv(file_path):
         # Select and reorder columns to match ALVADESC_DESCRIPTOR_NAMES
         full_df = full_df[ALVADESC_DESCRIPTOR_NAMES]
 
-        mock_tsv_data_cache = full_df
+        # Calculate min/max for each descriptor column
+        min_vals = full_df.min()
+        max_vals = full_df.max()
+
+        mock_tsv_data_cache["df"] = full_df
+        mock_tsv_data_cache["min_vals"] = min_vals
+        mock_tsv_data_cache["max_vals"] = max_vals
+
         print(
-            f"Successfully loaded {len(mock_tsv_data_cache)} rows from TSV with {len(ALVADESC_DESCRIPTOR_NAMES)} alvaDesc features."
+            f"Successfully loaded {len(mock_tsv_data_cache['df'])} rows from TSV with {len(ALVADESC_DESCRIPTOR_NAMES)} alvaDesc features."
         )
         return mock_tsv_data_cache
     except FileNotFoundError:
         print(f"Error: Mock TSV file not found at {file_path}")
-        mock_tsv_data_cache = pd.DataFrame()
+        mock_tsv_data_cache["df"] = pd.DataFrame()
+        mock_tsv_data_cache["min_vals"] = pd.Series()
+        mock_tsv_data_cache["max_vals"] = pd.Series()
         return mock_tsv_data_cache
     except Exception as e:
         print(f"Error loading mock data from TSV: {e}")
-        mock_tsv_data_cache = pd.DataFrame()
+        mock_tsv_data_cache["df"] = pd.DataFrame()
+        mock_tsv_data_cache["min_vals"] = pd.Series()
+        mock_tsv_data_cache["max_vals"] = pd.Series()
         return mock_tsv_data_cache
+
+
+def generate_random_alvadesc_features(smiles_list: List[str], min_vals: pd.Series, max_vals: pd.Series) -> pd.DataFrame:
+    """
+    Generates random alvaDesc-like features for a list of SMILES strings by sampling
+    uniformly within the provided min/max ranges for each descriptor.
+    """
+    num_smiles = len(smiles_list)
+    random_data = {}
+    for desc_name in ALVADESC_DESCRIPTOR_NAMES:
+        if desc_name in min_vals.index and desc_name in max_vals.index:
+            low = min_vals[desc_name]
+            high = max_vals[desc_name]
+            # Handle cases where min == max (e.g., all 0.0 values) to avoid issues with uniform
+            if low == high:
+                random_data[desc_name] = np.full(num_smiles, low)
+            else:
+                random_data[desc_name] = np.random.uniform(low, high, num_smiles)
+        else:
+            # Fallback for descriptors not found in min/max (should not happen if ALVADESC_DESCRIPTOR_NAMES is correct)
+            print(f"Warning: Min/max not found for descriptor {desc_name}. Filling with 0.0.")
+            random_data[desc_name] = np.full(num_smiles, 0.0)
+
+    random_df = pd.DataFrame(random_data, index=smiles_list, columns=ALVADESC_DESCRIPTOR_NAMES)
+    print(f"Generated {num_smiles} rows of random alvaDesc features.")
+    return random_df
 
 
 def generate_all_features(smiles_input, mock_alvadesc=False):
@@ -144,6 +181,7 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
 
     Args:
         smiles_input (str or list[str]): A single SMILES string or a list of SMILES strings.
+        mock_alvadesc (bool): If True, use mock alvaDesc descriptors from TSV or generate random ones.
 
     Returns:
         pd.DataFrame: A DataFrame where each row corresponds to a SMILES string
@@ -193,29 +231,45 @@ def generate_all_features(smiles_input, mock_alvadesc=False):
 
     if mock_alvadesc:
         print("Mocking alvaDesc descriptors from TSV for uncached SMILES...")
-        mock_data = load_mock_descriptors_from_tsv(TSV_MOCK_FILE_PATH)
+        mock_cache = load_mock_descriptors_from_tsv(TSV_MOCK_FILE_PATH)
+        mock_data = mock_cache["df"]
+        min_vals = mock_cache["min_vals"]
+        max_vals = mock_cache["max_vals"]
 
         if mock_data.empty:
-            print("Failed to load mock TSV data. Returning empty DataFrame.")
-            return pd.DataFrame()
+            print("Failed to load mock TSV data. Generating all random features.")
+            alva_desc_df = generate_random_alvadesc_features(smiles_to_process, min_vals, max_vals)
+        else:
+            found_smiles = [s for s in smiles_to_process if s in mock_data.index]
+            not_found_smiles = [s for s in smiles_to_process if s not in mock_data.index]
 
-        alva_desc_rows = []
-        for smiles in smiles_to_process:
-            if smiles not in mock_data.index:
-                print(f"DEBUG: SMILES '{smiles}' not found in mock_data.index. Raising ValueError.")
-                raise ValueError("SMILES string must be in the example set.")
-            alva_desc_rows.append(mock_data.loc[smiles])
+            mocked_rows = []
+            if found_smiles:
+                mocked_rows = mock_data.loc[found_smiles]
 
-        temp_alva_desc_df = pd.DataFrame(alva_desc_rows, index=smiles_to_process)
+            random_rows_df = pd.DataFrame()
+            if not_found_smiles:
+                print(f"SMILES not found in mock data: {not_found_smiles}. Generating random features for them.")
+                random_rows_df = generate_random_alvadesc_features(not_found_smiles, min_vals, max_vals)
 
-        # Ensure all expected ALVADESC_DESCRIPTOR_NAMES are present, fill missing with 0.0
+            if found_smiles and not_found_smiles:
+                alva_desc_df = pd.concat([mocked_rows, random_rows_df])
+            elif found_smiles:
+                alva_desc_df = mocked_rows
+            elif not_found_smiles:
+                alva_desc_df = random_rows_df
+            
+            # Ensure order of SMILES is maintained as in smiles_to_process
+            alva_desc_df = alva_desc_df.loc[smiles_to_process]
+
+        # Ensure all expected ALVADESC_DESCRIPTOR_NAMES are present in the final alva_desc_df
         for desc_name in ALVADESC_DESCRIPTOR_NAMES:
-            if desc_name not in temp_alva_desc_df.columns:
-                temp_alva_desc_df[desc_name] = 0.0
+            if desc_name not in alva_desc_df.columns:
+                alva_desc_df[desc_name] = 0.0
+        alva_desc_df = alva_desc_df[ALVADESC_DESCRIPTOR_NAMES] # Reorder to match
 
-        # Select and reorder columns to match ALVADESC_DESCRIPTOR_NAMES
-        alva_desc_df = temp_alva_desc_df[ALVADESC_DESCRIPTOR_NAMES]
-        print(f"Successfully mocked alvaDesc data for {len(smiles_to_process)} uncached SMILES strings from TSV.")
+
+        print(f"Successfully processed alvaDesc data for {len(smiles_to_process)} uncached SMILES strings.")
 
     elif ALVADESC_DESCRIPTOR_NAMES:
         try:
