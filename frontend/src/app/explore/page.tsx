@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Metadata } from 'next';
+import React, { useState, useEffect, Suspense } from 'react'; // Import Suspense
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import ExplorationForm from '@/components/ExplorationForm';
 
-export default function ExplorePage() {
+function ExplorePageComponent() { // Renamed
+  const searchParams = useSearchParams();
   const [hasResults, setHasResults] = useState<boolean>(false);
+
+  const resetKey = searchParams.get('_t') || 'default';
+
+  useEffect(() => {
+    setHasResults(false);
+  }, [resetKey, searchParams]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
@@ -19,10 +26,19 @@ export default function ExplorePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ExplorationForm onResultsLoaded={setHasResults} />
+            <ExplorationForm key={resetKey} onResultsLoaded={setHasResults} />
           </CardContent>
         </Card>
       </main>
     </div>
   );
 }
+
+export default function ExplorePage() { // New wrapper function
+  return (
+    <Suspense fallback={<div>Loading Explore Page...</div>}>
+      <ExplorePageComponent />
+    </Suspense>
+  );
+}
+

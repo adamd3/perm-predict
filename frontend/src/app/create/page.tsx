@@ -18,7 +18,7 @@ export default function CreatePage() {
 
   const handleSubmit = () => {
     if (smiles) {
-      router.push(`/?smiles=${encodeURIComponent(smiles)}`); // Navigate to predict page with SMILES
+      router.push(`/predict?smiles=${encodeURIComponent(smiles)}`); // Navigate to predict page with SMILES
     } else {
       alert('Please draw a molecule first.');
     }
