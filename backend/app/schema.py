@@ -306,7 +306,7 @@ class Mutation:
             # Submit job to Celery with metadata
             task = celery_app.send_task(
                 'predict_permeability',
-                args=[job_input.smiles_list],
+                args=(job_input.smiles_list,),
                 kwargs={
                     'created_at': created_at,
                     'job_name': job_input.job_name

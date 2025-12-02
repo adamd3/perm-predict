@@ -23,8 +23,6 @@ function PredictionPageComponent() {
 
   useEffect(() => {
     const smilesParam = searchParams.get('smiles');
-    // Only set initialSmiles if it's explicitly provided in the URL
-    // Otherwise, it should remain empty to ensure the form starts fresh
     setInitialSmiles(smilesParam || '');
     // Reset hasResults when the page effectively reloads (due to _t or smiles change)
     setHasResults(false);

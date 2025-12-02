@@ -49,9 +49,7 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
   useEffect(() => {
     if (initialSmiles && initialSmiles !== smilesInput && !isProcessing) {
       setSmilesInput(initialSmiles);
-      // Automatically trigger prediction if initialSmiles is provided
-      // We need to simulate the event object for handleSinglePrediction
-      handleSinglePrediction({ preventDefault: () => {} } as React.FormEvent);
+      handleSinglePrediction(initialSmiles);
     }
   }, [initialSmiles, isProcessing]);
 
@@ -118,21 +116,20 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
     }
   }, [predictionResultData, onResultsLoaded]);
 
-  const handleSinglePrediction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setResults([]);
-    setProgress(0);
-    if (onResultsLoaded) {
-      onResultsLoaded(false);
-    }
-    
-    try {
-      const { data } = await submitPredictionJobMutation({
-        variables: { jobInput: { smilesList: [smilesInput], jobName: 'Single Prediction' } }
-      });
+    const handleSinglePrediction = async (smilesToPredict: string, e?: React.FormEvent) => {
+      e?.preventDefault();
+      setError('');
+      setResults([]);
+      setProgress(0);
+      if (onResultsLoaded) {
+        onResultsLoaded(false);
+      }
       
-      if (data?.submitPredictionJob) {
+      try {
+        const mutationVariables = { jobInput: { smilesList: [smilesToPredict], jobName: 'Single Prediction' } };
+        const { data } = await submitPredictionJobMutation({
+          variables: mutationVariables
+        });      if (data?.submitPredictionJob) {
                     const jobResponse = data.submitPredictionJob as JobStatus;
         console.log("Job Response:", jobResponse);
         setCurrentJobId(jobResponse.jobId);
@@ -253,7 +250,7 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
         </TabsList>
 
             <TabsContent value="single" className="space-y-4 mt-4">
-              <form onSubmit={handleSinglePrediction} className="space-y-4">
+              <form onSubmit={(e) => handleSinglePrediction(smilesInput, e)} className="space-y-4">
                 <div>
                   <Input
                     placeholder="Enter SMILES string (e.g., CCO for ethanol)..."
