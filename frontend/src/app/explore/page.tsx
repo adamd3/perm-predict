@@ -22,7 +22,7 @@ function ExplorePageComponent() { // Renamed
           <CardHeader>
             <CardTitle className="text-3xl font-bold">Explore compound permeability</CardTitle>
             <CardDescription className="mt-2 text-lg">
-              Enter a SMILES string to predict permeability of related compounds
+              Enter a SMILES string of a chemical compound. Our system will then generate and predict the permeability of chemically similar compounds, exploring potential modifications or alternative structures that might exhibit improved permeant properties.
             </CardDescription>
           </CardHeader>
           <CardContent>
