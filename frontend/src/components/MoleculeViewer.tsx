@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import initRDKit from '@rdkit/rdkit';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { useTheme } from "next-themes";
 
 interface MoleculeViewerProps {
   smiles: string;
@@ -11,6 +12,7 @@ interface MoleculeViewerProps {
 const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ smiles, width = 300, height = 200 }) => {
   const molRef = useRef<HTMLCanvasElement>(null); // Change to HTMLCanvasElement
   const [RDKit, setRDKit] = useState<any>(null);
+  const { theme } = useTheme(); // Get the current theme
 
   useEffect(() => {
     console.log("MoleculeViewer: Attempting to initialize RDKit...");
@@ -74,7 +76,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ smiles, width = 300, he
       </DialogTrigger>
       <DialogContent className="max-w-fit p-0">
         <div className="p-4">
-          <h4 className="text-lg font-semibold mb-2 text-black">Molecule Structure</h4>
+          <h4 className="text-lg font-semibold mb-2 text-foreground">Molecule Structure</h4>
           <MoleculeViewer smiles={smiles} width={600} height={400} /> {/* Larger version in modal */}
           <p className="text-sm text-gray-500 mt-2 break-all">SMILES: {smiles}</p>
         </div>
