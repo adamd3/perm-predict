@@ -7,7 +7,7 @@ python-dotenv
 numpy
 rdkit
 scikit-learn
-
+fastapi-limiter
 joblib
 pydantic
 pydantic-settings
