@@ -289,7 +289,6 @@ from fastapi_limiter.depends import RateLimiter # Import RateLimiter (limiter)
 @strawberry.type
 class Mutation:
     @strawberry.field
-    @RateLimiter(times=20, seconds=60) # Apply rate limit: 20 requests per minute
     def submit_prediction_job(self, job_input: PredictionJobInput) -> JobStatus:
 
         """Submit a new prediction job and return the job ID."""

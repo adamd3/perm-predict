@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request, status # Import status for HTTP status codes
+from fastapi import FastAPI, Request, status, Depends # Import status and Depends for HTTP status codes
 from starlette.middleware.base import BaseHTTPMiddleware
 from strawberry.fastapi import GraphQLRouter
 from fastapi.responses import JSONResponse # Import JSONResponse
-from fastapi_limiter.exceptions import RateLimitExceeded # Import RateLimitExceeded
+from slowapi.errors import RateLimitExceeded # Import RateLimitExceeded
 
 import time
 import logging
@@ -11,6 +11,7 @@ import datetime
 # Import for fastapi-limiter
 from fastapi_limiter import FastAPILimiter
 from redis.asyncio import Redis as Aioredis # Use Aioredis for async support
+from fastapi_limiter.depends import RateLimiter # Import RateLimiter for dependencies
 
 from app.utils.logger import logger
 from app.schema import schema
@@ -82,7 +83,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
     )
 
 # Create GraphQL router
-graphql_app = GraphQLRouter(schema)
+graphql_app = GraphQLRouter(schema, dependencies=[Depends(RateLimiter(times=30, seconds=60))])
 
 # Include GraphQL router
 app.include_router(graphql_app, prefix="/graphql")
