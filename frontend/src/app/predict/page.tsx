@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
@@ -33,9 +34,14 @@ function PredictionPageComponent() {
       <div className="container mx-auto p-4 max-w-full">
         <Card className="mb-8 shadow-xl hover:shadow-2xl transition-shadow duration-300 max-w-2xl mx-auto">
           <CardHeader className="text-center">
-            <CardTitle className="text-6xl font-extrabold mb-4 text-foreground dark:text-foreground">
-              Perm-Predict
-            </CardTitle>
+
+            <Image
+              src="/images/perm_predict_logo.png"
+              alt="Perm-Predict Logo"
+              width={300}
+              height={300}
+              className="mx-auto block mb-4"
+            />
             <CardDescription className="text-2xl mb-8 text-muted-foreground dark:text-muted-foreground">
               AI-based prediction of chemical accumulation in bacteria
             </CardDescription>
