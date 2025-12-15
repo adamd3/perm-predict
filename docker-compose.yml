@@ -19,12 +19,15 @@ services:
       - ./backend/app/ml_models:/app/app/ml_models
       - ./backend/logs:/app/logs
       - ./alvaDescCLI_linux:/app/backend/app/ml_models/alvaDescCLI
+      - ./backend/tests:/app/tests
     env_file:
       - ./backend/.env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - MODEL_CLASSIFIER_PATH=/app/app/ml_models/model_mtb.json
+    ports:
+      - "8000:8000"
     command: bash -c "chmod -R +rwx /app/backend/app/ml_models/alvaDescCLI && ls -l /app/backend/app/ml_models/alvaDescCLI && /app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000"
     depends_on:
       redis:
