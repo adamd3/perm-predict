@@ -22,6 +22,8 @@ class PredictionResult(BaseModel):
     smiles: str = Field(..., description="Input SMILES string")
     prediction: float = Field(..., description="Predicted permeability value")
     confidence: float = Field(..., description="Model confidence score")
+    permeant_probability: float = Field(..., description="Probability of being permeant (prob_1)") # Added
+    class_probabilities: List[float] = Field(..., description="Probabilities for each class [prob_0, prob_1]") # Added
     uncertainty: Optional[float] = Field(None, description="Prediction uncertainty from ensemble variance")
     ensemble_std: Optional[float] = Field(None, description="Standard deviation of ensemble predictions")
     classifier_prediction: int = Field(..., description="Binary classifier prediction (0 or 1)")

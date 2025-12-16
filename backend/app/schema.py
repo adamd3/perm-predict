@@ -34,6 +34,8 @@ class PredictionResult:
     smiles: str
     prediction: float
     confidence: float
+    permeant_probability: float # Added
+    class_probabilities: List[float] # Added
     uncertainty: Optional[float]
     ensemble_std: Optional[float]
     classifier_prediction: int
@@ -98,6 +100,8 @@ class Query:
                             smiles=r['smiles'],
                             prediction=r['prediction'],
                             confidence=r['confidence'],
+                            permeant_probability=r['class_probabilities'][1], # Pass permeant probability
+                            class_probabilities=r['class_probabilities'],    # Pass class probabilities
                             classifier_prediction=r['classifier_prediction'],
                             features=features,
                             features_summary=features_summary_list, # Assign the converted list
@@ -147,13 +151,14 @@ class Query:
                             smiles=r['smiles'],
                             prediction=r['prediction'],
                             confidence=r['confidence'],
+                            permeant_probability=r['class_probabilities'][1], # Pass permeant probability
+                            class_probabilities=r['class_probabilities'],    # Pass class probabilities
                             classifier_prediction=r['classifier_prediction'],
                             features=features,
                             features_summary=features_summary_list,
                             error=r.get('error')
                         )
-                    )
-                
+                    )                
                 return JobResultModel(
                     status='completed',
                     results=prediction_results,
@@ -198,13 +203,14 @@ class Query:
                             smiles=r['smiles'],
                             prediction=r['prediction'],
                             confidence=r['confidence'],
+                            permeant_probability=r['class_probabilities'][1], # Pass permeant probability
+                            class_probabilities=r['class_probabilities'],    # Pass class probabilities
                             classifier_prediction=r['classifier_prediction'],
                             features=features,
                             features_summary=features_summary_list, # Assign the converted list
                             error=r.get('error')
                         )
-                    )
-                
+                    )                
                 return JobResultModel(
                     status='completed',
                     results=prediction_results,

@@ -25,6 +25,8 @@ export const GET_PREDICTION_RESULT = gql`
         smiles
         prediction
         confidence
+        permeantProbability # Added
+        classProbabilities # Added
         uncertainty
         classifierPrediction
         features {
@@ -79,6 +81,8 @@ export const GET_EXPLORATION_RESULT = gql`
         smiles
         prediction
         confidence
+        permeantProbability # Added
+        classProbabilities # Added
         uncertainty
         classifierPrediction
         features {
