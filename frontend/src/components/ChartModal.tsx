@@ -43,8 +43,7 @@ const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, chartData, cha
 
   const handleSaveChart = () => {
     if (chartRef.current) {
-      // Chart.js 3.x and later: chartInstance is directly on the ref.current
-      const chartInstance = chartRef.current.chart; 
+      const chartInstance = chartRef.current; // Directly use chartRef.current as the Chart.js instance
       if (chartInstance) {
         const link = document.createElement('a');
         link.href = chartInstance.toBase64Image('image/png', 1); // Get data URL of the chart
