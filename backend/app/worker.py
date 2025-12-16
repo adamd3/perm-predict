@@ -22,6 +22,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import Descriptors
 from rdkit.Chem import Crippen
+from rdkit.Chem import rdMolDescriptors
 
 # Define the specific original SMILES and the hardcoded permuted SMILES list
 ORIGINAL_EXPLORE_SMILES = "FC(=C)c1sc(c(c1Br)C)CNCCCNc1cc(=O)c2c([nH]1)cccc2"
@@ -108,8 +109,9 @@ def predict_permeability(
 
         for smiles in smiles_list:
             processed_features_for_result = None  # Initialize here
+            mol = None # Initialize mol to None at the start of each iteration
             try:
-                mol = Chem.MolFromSmiles(smiles)
+                mol = Chem.MolFromSmiles(smiles) # This is where mol is assigned
                 if not mol:
                     raise ValueError(f"Invalid SMILES string: {smiles}")
 
@@ -165,6 +167,7 @@ def predict_permeability(
                         "classifier_prediction": 0,
                         "features": processed_features_for_result,
                         "error": f"Error creating DMatrix: {str(dmatrix_e)}",
+                        "features_summary": [], # Ensure features_summary is always present even on error
                     }
                     results.append(result)
                     continue  # Skip to the next SMILES in the list
@@ -176,12 +179,21 @@ def predict_permeability(
                 }
 
                 # Extract key features for summary using RDKit
-                features_summary = {
-                    "MW": Descriptors.MolWt(mol),
-                    "ALOGP": Crippen.MolLogP(mol),
-                    "nHDon": Descriptors.NumHDonors(mol),
-                    "TPSA": Descriptors.TPSA(mol),
-                }
+                # Ensure mol is valid before calculating RDKit descriptors
+                if mol:
+                    features_summary = {
+                        "MW": Descriptors.MolWt(mol),
+                        "ALOGP": Crippen.MolLogP(mol),
+                        "nHDon": Descriptors.NumHDonors(mol),
+                        "nHAcc": Descriptors.NumHAcceptors(mol),
+                        "nRotB": Descriptors.NumRotatableBonds(mol),
+                        "nAromR": Descriptors.NumAromaticRings(mol),
+                        "nHeavyA": Descriptors.HeavyAtomCount(mol),
+                        "fCSP3": rdMolDescriptors.CalcFractionCSP3(mol),
+                        "TPSA": Descriptors.TPSA(mol),
+                    }
+                else:
+                    features_summary = {} # Fallback if mol is somehow None
                 logger.info(f"RDKit-derived summary features: {features_summary}")
 
                 logger.info(f"Feature vector shape: {feature_vector.shape}")
@@ -400,7 +412,13 @@ def explore_permeability(
         # Now process the determined list of SMILES
         for smiles in permuted_smiles_list:
             processed_features_for_result = None
+            mol_for_descriptors = None # Initialize a new mol for each permuted smiles
+
             try:
+                mol_for_descriptors = Chem.MolFromSmiles(smiles)
+                if not mol_for_descriptors:
+                    raise ValueError(f"Invalid SMILES string from permuted list: {smiles}")
+
                 logger.info(f"Generating features for permuted SMILES: {smiles}")
                 all_features_df = generate_all_features(smiles, mock_alvadesc=settings.MOCK_ALVADESC)
                 feature_vector = all_features_df.values.astype(np.float32)
@@ -424,14 +442,21 @@ def explore_permeability(
                     "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()},
                 }
 
-                features_summary = {}
-                summary_feature_names = ["MW", "ALOGP", "nHDon", "TPSA"]
-                for sf_name in summary_feature_names:
-                    try:
-                        feature_index = FULL_FEATURE_NAMES.index(sf_name)
-                        features_summary[sf_name] = float(feature_vector[0, feature_index])
-                    except (ValueError, IndexError):
-                        features_summary[sf_name] = 0.0
+                # Extract key features for summary using RDKit
+                if mol_for_descriptors:
+                    features_summary = {
+                        "MW": Descriptors.MolWt(mol_for_descriptors),
+                        "ALOGP": Crippen.MolLogP(mol_for_descriptors),
+                        "nHDon": Descriptors.NumHDonors(mol_for_descriptors),
+                        "nHAcc": Descriptors.NumHAcceptors(mol_for_descriptors),
+                        "nRotB": Descriptors.NumRotatableBonds(mol_for_descriptors),
+                        "nAromR": Descriptors.NumAromaticRings(mol_for_descriptors),
+                        "nHeavyA": Descriptors.HeavyAtomCount(mol_for_descriptors),
+                        "fCSP3": rdMolDescriptors.CalcFractionCSP3(mol_for_descriptors),
+                        "TPSA": Descriptors.TPSA(mol_for_descriptors),
+                    }
+                else:
+                    features_summary = {} # Fallback if mol_for_descriptors is None
 
                 if classifier_model is not None:
                     raw_scores = classifier_model.predict(dmatrix_feature_vector, output_margin=True)
