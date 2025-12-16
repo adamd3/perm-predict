@@ -106,7 +106,7 @@ const ExplorationForm = ({ initialSmiles = '', onResultsLoaded }: ExplorationFor
     
     try {
       const { data } = await submitExplorationJobMutation({
-        variables: { jobInput: { smilesList: [smilesInput], jobName: 'Compound Exploration' } }
+        variables: { jobInput: { smilesList: [smilesInput.trim()], jobName: 'Compound Exploration' } }
       });
       
       if (data?.submitExplorationJob) {

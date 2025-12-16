@@ -250,7 +250,7 @@ const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormP
         </TabsList>
 
             <TabsContent value="single" className="space-y-4 mt-4">
-              <form onSubmit={(e) => handleSinglePrediction(smilesInput, e)} className="space-y-4">
+              <form onSubmit={(e) => handleSinglePrediction(smilesInput.trim(), e)} className="space-y-4">
                 <div>
                   <Input
                     placeholder="Enter SMILES string (e.g., CCO for ethanol)..."
