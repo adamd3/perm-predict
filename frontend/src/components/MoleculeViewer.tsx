@@ -78,7 +78,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ smiles, width = 300, he
         <div className="p-4">
           <h4 className="text-lg font-semibold mb-2 text-foreground">Molecule Structure</h4>
           <MoleculeViewer smiles={smiles} width={600} height={400} /> {/* Larger version in modal */}
-          <p className="text-sm text-gray-500 mt-2 break-all">SMILES: {smiles}</p>
+          <p className={`text-sm mt-2 break-all ${theme === 'light' ? 'text-black' : 'text-white'}`}>SMILES: {smiles}</p>
         </div>
       </DialogContent>
     </Dialog>
