@@ -28,6 +28,7 @@ function generateMockPrediction(smiles: string): PredictionResult {
     smiles,
     prediction,
     confidence: Math.round(confidence * 1000) / 1000,
+    permeantProbability: probPermeant,
     classifierPrediction: prediction,
     classProbabilities: [probImpermeant, probPermeant],
   };

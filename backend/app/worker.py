@@ -11,12 +11,37 @@ import threading
 from app.config import settings
 from app.utils.logger import logger
 from app.utils.processing import smiles_to_comprehensive_features, combine_features
-from app.ml_models.alvadesc_feature_generation import generate_all_features, FULL_FEATURE_NAMES, MORGAN_FINGERPRINT_COUNT
+from app.ml_models.alvadesc_feature_generation import (
+    generate_all_features,
+    FULL_FEATURE_NAMES,
+    MORGAN_FINGERPRINT_COUNT,
+)
 from app.models import PredictionFeatures, MolecularDescriptors  # Import Pydantic models
 from app.celery_instance import celery_app  # Import celery_app from the new instance file
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit.Chem import Descriptors
+from rdkit.Chem import Crippen
+from rdkit.Chem import rdMolDescriptors
+
+# Define the specific original SMILES and the hardcoded permuted SMILES list
+ORIGINAL_EXPLORE_SMILES = "FC(=C)c1sc(c(c1Br)C)CNCCCNc1cc(=O)c2c([nH]1)cccc2"
+HARDCODED_EXPLORE_SMILES = [
+    "C=C(F)c1sc(CNCCCNc2cc(=O)c3cccc(O)c3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNCC(O)CNc2cc(=O)c3ccccc3[nH]2)c(C)c1Br",
+    "CC=C(F)c1sc(CNCCCNc2cc(=O)c3ccccc3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNCCCNc2cc(=O)c3cc(C)ccc3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNCCCNc2cc(=O)c3ccccc3[nH]2)c(CC)c1Br",
+    "C=C(F)c1sc(C(C)NCCCNc2cc(=O)c3ccccc3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNCCCNc2cc(=O)c3ccc(O)cc3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNC(O)CCNc2cc(=O)c3ccccc3[nH]2)c(C)c1Br",
+    "C=C(F)c1sc(CNCCCNc2cc(=O)c3ccc(C)cc3[nH]2)c(C)c1Br",
+    "Cc1c(CNCCCNc2cc(=O)c3ccccc3[nH]2)sc(C(F)=CO)c1Br",
+]
 
 
 # Removed global classifier_model and top-level load_models()
+
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
@@ -52,7 +77,7 @@ def predict_permeability(
 ) -> Dict[str, Any]:
     logger.info(f"predict_permeability received smiles_list: type={type(smiles_list)}, content={smiles_list}")
     logger.info(f"XGBoost version: {xgb.__version__}")
-    xgb.set_config(verbosity=3) # Enable verbose XGBoost logging
+    xgb.set_config(verbosity=3)  # Enable verbose XGBoost logging
     if not isinstance(smiles_list, list):
         logger.error(f"smiles_list is not a list! Type: {type(smiles_list)}")
         raise TypeError("smiles_list must be a list of strings")
@@ -84,7 +109,12 @@ def predict_permeability(
 
         for smiles in smiles_list:
             processed_features_for_result = None  # Initialize here
+            mol = None # Initialize mol to None at the start of each iteration
             try:
+                mol = Chem.MolFromSmiles(smiles) # This is where mol is assigned
+                if not mol:
+                    raise ValueError(f"Invalid SMILES string: {smiles}")
+
                 # Extract features using alvaDesc CLI wrapper and Morgan fingerprints
                 logger.info(f"Generating features for SMILES: {smiles}")
                 logger.info(f"DEBUG: settings.MOCK_ALVADESC = {settings.MOCK_ALVADESC}")  # New line
@@ -110,17 +140,21 @@ def predict_permeability(
 
                 # Convert numpy array to DMatrix for XGBoost Booster model
                 try:
-                    logger.info(f"Preparing to create actual DMatrix in a separate thread. Feature vector shape: {feature_vector.shape}, FULL_FEATURE_NAMES length: {len(FULL_FEATURE_NAMES)}")
+                    logger.info(
+                        f"Preparing to create actual DMatrix in a separate thread. Feature vector shape: {feature_vector.shape}, FULL_FEATURE_NAMES length: {len(FULL_FEATURE_NAMES)}"
+                    )
                     dmatrix_thread = DMatrixCreationThread(feature_vector, FULL_FEATURE_NAMES)
                     dmatrix_thread.start()
-                    dmatrix_thread.join() # Wait for the thread to complete
+                    dmatrix_thread.join()  # Wait for the thread to complete
 
                     if dmatrix_thread.error:
                         raise dmatrix_thread.error
 
                     dmatrix_feature_vector = dmatrix_thread.dmatrix
                     logger.info("Actual DMatrix created successfully in main thread after thread join.")
-                    logger.info(f"DMatrix has {dmatrix_feature_vector.num_row()} rows and {dmatrix_feature_vector.num_col()} columns.")
+                    logger.info(
+                        f"DMatrix has {dmatrix_feature_vector.num_row()} rows and {dmatrix_feature_vector.num_col()} columns."
+                    )
 
                 except Exception as dmatrix_e:
                     logger.exception(f"Error creating DMatrix for SMILES {smiles}: {dmatrix_e}")
@@ -133,6 +167,7 @@ def predict_permeability(
                         "classifier_prediction": 0,
                         "features": processed_features_for_result,
                         "error": f"Error creating DMatrix: {str(dmatrix_e)}",
+                        "features_summary": [], # Ensure features_summary is always present even on error
                     }
                     results.append(result)
                     continue  # Skip to the next SMILES in the list
@@ -140,8 +175,26 @@ def predict_permeability(
                 # Store the generated features for the result
                 processed_features_for_result = {
                     "morgan_fingerprint": feature_vector[0, :MORGAN_FINGERPRINT_COUNT].tolist(),
-                    "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()}
+                    "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()},
                 }
+
+                # Extract key features for summary using RDKit
+                # Ensure mol is valid before calculating RDKit descriptors
+                if mol:
+                    features_summary = {
+                        "MW": Descriptors.MolWt(mol),
+                        "ALOGP": Crippen.MolLogP(mol),
+                        "nHDon": Descriptors.NumHDonors(mol),
+                        "nHAcc": Descriptors.NumHAcceptors(mol),
+                        "nRotB": Descriptors.NumRotatableBonds(mol),
+                        "nAromR": Descriptors.NumAromaticRings(mol),
+                        "nHeavyA": Descriptors.HeavyAtomCount(mol),
+                        "fCSP3": rdMolDescriptors.CalcFractionCSP3(mol),
+                        "TPSA": Descriptors.TPSA(mol),
+                    }
+                else:
+                    features_summary = {} # Fallback if mol is somehow None
+                logger.info(f"RDKit-derived summary features: {features_summary}")
 
                 logger.info(f"Feature vector shape: {feature_vector.shape}")
                 logger.info("Attempting classification prediction...")
@@ -187,6 +240,7 @@ def predict_permeability(
                             "class_probabilities": [0.5, 0.5],
                             "classifier_prediction": 0,
                             "features": processed_features_for_result,
+                            "features_summary": [],  # Add empty features_summary on error
                             "error": f"XGBoost prediction failed: {str(xgb_e)}",
                         }
                         results.append(result)
@@ -197,6 +251,13 @@ def predict_permeability(
                     classifier_pred = 0
                     confidence_stats = {"confidence": 0.0, "uncertainty": 1.0, "class_probabilities": [0.5, 0.5]}
                     logger.warning("No classifier model available - defaulting to non-permeant")
+
+                # Convert features_summary dictionary to a list of objects for frontend consumption
+                features_summary_list = []
+                for name, value in features_summary.items():
+                    features_summary_list.append({"name": name, "value": value})
+
+                logger.info(f"Features summary list being sent to frontend: {features_summary_list}")
 
                 logger.info("Classification prediction completed.")
 
@@ -210,7 +271,8 @@ def predict_permeability(
                     "uncertainty": confidence_stats["uncertainty"],
                     "class_probabilities": confidence_stats["class_probabilities"],
                     "classifier_prediction": int(classifier_pred),
-                    "features": processed_features_for_result,  # Use the updated features
+                    "features": processed_features_for_result,
+                    "features_summary": features_summary_list,
                     "error": None,
                 }
 
@@ -224,6 +286,7 @@ def predict_permeability(
                     "class_probabilities": [0.5, 0.5],
                     "classifier_prediction": 0,
                     "features": processed_features_for_result,
+                    "features_summary": [],  # Add empty features_summary on error
                     "error": str(e),
                 }
             results.append(result)
@@ -239,5 +302,219 @@ def predict_permeability(
     except Exception as e:
         logger.error(f"Task failed: {e}")
         traceback.print_exc()  # Print full traceback
+        self.retry(countdown=60, max_retries=3)
+        return {"status": "failed", "error": str(e), "results": []}
+
+
+@celery_app.task(bind=True, name="explore_permeability")
+def explore_permeability(
+    self, original_smiles: str, created_at: Optional[str] = None, job_name: Optional[str] = None
+) -> Dict[str, Any]:
+    logger.info(f"explore_permeability received original_smiles: {original_smiles}")
+
+    classifier_model = None
+    classifier_path = settings.MODEL_CLASSIFIER_PATH
+    if os.path.exists(classifier_path):
+        with open(classifier_path, "rb") as f:
+            classifier_model = xgb.Booster()
+            classifier_model.load_model(classifier_path)
+        logger.info("Classifier model loaded successfully inside explore_permeability task.")
+    else:
+        logger.error("Classifier model could not be loaded inside explore_permeability task")
+        return {"status": "failed", "error": "Classifier model not found", "results": []}
+
+    results = []
+    permuted_smiles_list: List[str] = []  # Initialize here to ensure it's always defined
+
+    try:  # Main try block for the entire function logic
+        # --- Conditional Hardcoding Logic ---
+        if settings.MOCK_ALVADESC and original_smiles == ORIGINAL_EXPLORE_SMILES:
+            permuted_smiles_list = list(HARDCODED_EXPLORE_SMILES)  # Ensure it's a list
+            logger.info("Using hardcoded permuted SMILES for specific input and MOCK_ALVADESC is True.")
+        else:
+            # Existing RDKit-based permutation logic
+            try:
+                mol = Chem.MolFromSmiles(original_smiles)
+                if not mol:
+                    raise ValueError("Invalid SMILES string provided.")
+
+                unique_permuted_smiles = set()
+                unique_permuted_smiles.add(original_smiles)  # Always include original
+
+                # Strategy 1: Add a methyl group
+                for _ in range(5):
+                    if len(unique_permuted_smiles) >= 10:
+                        break
+                    try:
+                        temp_mol = Chem.Mol(mol)
+                        rw_mol = Chem.RWMol(temp_mol)
+                        eligible_atoms = [
+                            atom.GetIdx()
+                            for atom in rw_mol.GetAtoms()
+                            if atom.GetAtomicNum() == 6
+                            and (atom.GetImplicitValence() > 0 or atom.GetExplicitValence() < atom.GetTotalValence())
+                        ]
+                        if not eligible_atoms:
+                            continue
+                        attach_idx = int(np.random.choice(eligible_atoms))
+                        new_atom = Chem.Atom("C")
+                        new_atom_idx = rw_mol.AddAtom(new_atom)
+                        rw_mol.AddBond(attach_idx, new_atom_idx, Chem.BondType.SINGLE)
+                        Chem.SanitizeMol(rw_mol)
+                        new_smiles = Chem.MolToSmiles(rw_mol)
+                        if new_smiles and new_smiles not in unique_permuted_smiles:
+                            unique_permuted_smiles.add(new_smiles)
+                            logger.info(f"Generated permuted SMILES (methyl addition): {new_smiles}")
+                    except Exception as add_e:
+                        logger.warning(f"Error adding methyl group for {original_smiles}: {add_e}")
+
+                # Strategy 2: Add a hydroxyl group
+                for _ in range(5):
+                    if len(unique_permuted_smiles) >= 10:
+                        break
+                    try:
+                        temp_mol = Chem.Mol(mol)
+                        rw_mol = Chem.RWMol(temp_mol)
+                        eligible_oh_atoms = [
+                            atom.GetIdx()
+                            for atom in rw_mol.GetAtoms()
+                            if atom.GetAtomicNum() == 6 and atom.GetImplicitValence() > 0
+                        ]
+                        if not eligible_oh_atoms:
+                            continue
+                        attach_oh_idx = int(np.random.choice(eligible_oh_atoms))
+                        new_o_atom = Chem.Atom("O")
+                        new_o_idx = rw_mol.AddAtom(new_o_atom)
+                        rw_mol.AddBond(attach_oh_idx, new_o_idx, Chem.BondType.SINGLE)
+                        # The H will be added implicitly by SanitizeMol if needed
+
+                        Chem.SanitizeMol(rw_mol)  # Attempt to sanitize
+                        new_smiles = Chem.MolToSmiles(rw_mol)
+                        if new_smiles and new_smiles not in unique_permuted_smiles:
+                            unique_permuted_smiles.add(new_smiles)
+                            logger.info(f"Generated permuted SMILES (hydroxyl addition): {new_smiles}")
+                    except Exception as sub_e:
+                        logger.warning(f"Error substituting hydroxyl group for {original_smiles}: {sub_e}")
+
+                permuted_smiles_list = list(unique_permuted_smiles)
+                while len(permuted_smiles_list) < 10:
+                    permuted_smiles_list.append(original_smiles)
+                permuted_smiles_list = permuted_smiles_list[:10]
+
+            except Exception as e:
+                logger.error(f"RDKit permutation failed for {original_smiles}: {e}")
+                # Fallback to just the original SMILES if RDKit permutation fails
+                permuted_smiles_list = [original_smiles] * 10
+                traceback.print_exc()
+
+        # --- End Conditional Hardcoding Logic ---
+
+        # Now process the determined list of SMILES
+        for smiles in permuted_smiles_list:
+            processed_features_for_result = None
+            mol_for_descriptors = None # Initialize a new mol for each permuted smiles
+
+            try:
+                mol_for_descriptors = Chem.MolFromSmiles(smiles)
+                if not mol_for_descriptors:
+                    raise ValueError(f"Invalid SMILES string from permuted list: {smiles}")
+
+                logger.info(f"Generating features for permuted SMILES: {smiles}")
+                all_features_df = generate_all_features(smiles, mock_alvadesc=settings.MOCK_ALVADESC)
+                feature_vector = all_features_df.values.astype(np.float32)
+
+                if feature_vector.ndim == 1:
+                    feature_vector = feature_vector.reshape(1, -1)
+                elif feature_vector.ndim > 2:
+                    feature_vector = feature_vector[0].reshape(1, -1)
+
+                dmatrix_thread = DMatrixCreationThread(feature_vector, FULL_FEATURE_NAMES)
+                dmatrix_thread.start()
+                dmatrix_thread.join()
+
+                if dmatrix_thread.error:
+                    raise dmatrix_thread.error
+
+                dmatrix_feature_vector = dmatrix_thread.dmatrix
+
+                processed_features_for_result = {
+                    "morgan_fingerprint": feature_vector[0, :MORGAN_FINGERPRINT_COUNT].tolist(),
+                    "descriptors": {"alvadesc_features": feature_vector[0, MORGAN_FINGERPRINT_COUNT:].tolist()},
+                }
+
+                # Extract key features for summary using RDKit
+                if mol_for_descriptors:
+                    features_summary = {
+                        "MW": Descriptors.MolWt(mol_for_descriptors),
+                        "ALOGP": Crippen.MolLogP(mol_for_descriptors),
+                        "nHDon": Descriptors.NumHDonors(mol_for_descriptors),
+                        "nHAcc": Descriptors.NumHAcceptors(mol_for_descriptors),
+                        "nRotB": Descriptors.NumRotatableBonds(mol_for_descriptors),
+                        "nAromR": Descriptors.NumAromaticRings(mol_for_descriptors),
+                        "nHeavyA": Descriptors.HeavyAtomCount(mol_for_descriptors),
+                        "fCSP3": rdMolDescriptors.CalcFractionCSP3(mol_for_descriptors),
+                        "TPSA": Descriptors.TPSA(mol_for_descriptors),
+                    }
+                else:
+                    features_summary = {} # Fallback if mol_for_descriptors is None
+
+                if classifier_model is not None:
+                    raw_scores = classifier_model.predict(dmatrix_feature_vector, output_margin=True)
+                    classifier_prob_positive = sigmoid(raw_scores)
+                    classifier_prob_negative = 1 - classifier_prob_positive
+                    classifier_prob = np.array([[classifier_prob_negative[0], classifier_prob_positive[0]]])
+                    classifier_pred = (classifier_prob_positive > 0.5).astype(int)[0]
+                    confidence_stats = calculate_classification_confidence(classifier_prob[0])
+                else:
+                    classifier_pred = 0
+                    confidence_stats = {"confidence": 0.0, "uncertainty": 1.0, "class_probabilities": [0.5, 0.5]}
+
+                features_summary_list = []
+                for name, value in features_summary.items():
+                    features_summary_list.append({"name": name, "value": value})
+
+                prediction = 1 if classifier_pred == 1 else 0
+
+                results.append(
+                    {
+                        "smiles": smiles,
+                        "prediction": prediction,
+                        "confidence": confidence_stats["confidence"],
+                        "uncertainty": confidence_stats["uncertainty"],
+                        "class_probabilities": confidence_stats["class_probabilities"],
+                        "classifier_prediction": int(classifier_pred),
+                        "features": processed_features_for_result,
+                        "features_summary": features_summary_list,
+                        "error": None,
+                    }
+                )
+
+            except Exception as e:
+                logger.exception(f"Error processing permuted SMILES {smiles}: {e}")
+                results.append(
+                    {
+                        "smiles": smiles,
+                        "prediction": 0,
+                        "confidence": 0.0,
+                        "uncertainty": 1.0,
+                        "class_probabilities": [0.5, 0.5],
+                        "classifier_prediction": 0,
+                        "features": processed_features_for_result,
+                        "features_summary": [],
+                        "error": str(e),
+                    }
+                )
+
+        return {
+            "status": "completed",
+            "results": results,
+            "total_processed": len(results),
+            "successful": len([r for r in results if r["error"] is None]),
+            "failed": len([r for r in results if r["error"] is not None]),
+        }
+
+    except Exception as e:
+        logger.error(f"Exploration task failed for {original_smiles}: {e}")
+        traceback.print_exc()
         self.retry(countdown=60, max_retries=3)
         return {"status": "failed", "error": str(e), "results": []}

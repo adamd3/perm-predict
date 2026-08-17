@@ -17,26 +17,14 @@ The repo consists of two main packages:
 
 ```
 perm-predict/
-├── backend/           # FastAPI + GraphQL + Celery
-│   ├── app/
-│   │   ├── main.py           # GraphQL API server (FastAPI + Strawberry)
-│   │   ├── worker.py         # Celery worker for ML predictions
-│   │   ├── schema.py         # GraphQL types, queries, mutations
-│   │   ├── models.py         # Pydantic models
-│   │   ├── config.py         # Application settings
-│   │   ├── ml_models/        # Serialized ML models (.pkl)
-│   │   └── utils/
-│   │       ├── processing.py # Feature extraction
-│   │       ├── validation.py # Model validation
-│   │       └── logger.py     # Logging utilities
-│   ├── tests/                # Pytest test suite
-│   └── requirements.txt      # Python dependencies
-├── frontend/          # Next.js + TypeScript + Tailwind
-│   ├── src/
-│   │   ├── app/             # Next.js app router
-│   │   └── components/      # React components
-│   └── package.json         # Node dependencies
-└── docker-compose.yml       # Multi-service orchestration
+├── backend/                  # FastAPI + Strawberry GraphQL
+│   ├── app/                  # Application core, schemas & ML worker
+│   ├── ml_models/            # Serialized model artifacts
+│   └── Dockerfile
+├── frontend/                 # Next.js 14 (TypeScript + Tailwind CSS)
+│   ├── src/                  # App router & UI components
+│   └── Dockerfile
+└── docker-compose.yml        # Multi-container orchestration
 ```
 
 ### Backend (FastAPI + Celery + GraphQL)

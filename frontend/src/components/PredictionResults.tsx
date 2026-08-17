@@ -10,11 +10,32 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
-import type { PredictionResultsProps } from '@/lib/types'
+const MoleculeViewer = dynamic(() => import('./MoleculeViewer'), {
+  ssr: false,
+});
+
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, LogarithmicScale, BarElement, Title, Tooltip, Legend, ChartOptions, ChartData } from 'chart.js';
+import ChartModal from './ChartModal';
+
+ChartJS.register(CategoryScale, LinearScale, LogarithmicScale, BarElement, Title, Tooltip, Legend);
+
+import type { PredictionResultsProps, FeatureSummaryItem } from '@/lib/types'
 
 const PredictionResults = ({ results }: PredictionResultsProps) => {
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [modalChartData, setModalChartData] = React.useState<ChartData<'bar'> | null>(null);
+  const [modalChartTitle, setModalChartTitle] = React.useState('');
+
   if (!results.length) return null;
+
+  const handleChartClick = (result: any) => {
+    setModalChartData(getChartData(result.featuresSummary));
+    setModalChartTitle(`Feature Summary for ${result.smiles}`);
+    setIsModalOpen(true);
+  };
 
   const getPredictionBadge = (classifierPrediction: number) => {
     const isPermeant = classifierPrediction === 1;
@@ -29,11 +50,55 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
     );
   };
 
+  const getChartData = (featuresSummary: FeatureSummaryItem[]) => {
+    const labels = featuresSummary.map(item => item.name);
+    const data = featuresSummary.map(item => item.value);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Feature Value',
+          data,
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  const chartOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: { size: 8 },
+          maxRotation: 90,
+          minRotation: 90,
+        }
+      },
+      y: {
+        type: 'logarithmic',
+        ticks: { font: { size: 8 } },
+        title: {
+          display: true,
+          text: 'Log Value',
+        },
+      },
+    },
+  };
+
   return (
     <div className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Prediction Results</h3>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm">
           {results.length} compound{results.length > 1 ? 's' : ''} analyzed
         </div>
       </div>
@@ -41,19 +106,25 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
       <div className="overflow-x-auto border rounded-lg">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="w-[300px]">SMILES</TableHead>
+            <TableRow>
+              <TableHead className="w-[300px]">SMILES / Structure</TableHead>
               <TableHead className="w-[150px]">Prediction</TableHead>
-              <TableHead className="w-[120px]">Permeant Probability</TableHead>
+              <TableHead className="w-[120px]">Permeant Score</TableHead>
               <TableHead className="w-[200px]">Confidence</TableHead>
-              <TableHead className="w-[120px]">Error</TableHead>
+              <TableHead className="w-[150px]">Features Summary</TableHead>
+              <TableHead className="w-[120px]">Status/Error</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {results.map((result, index) => (
-              <TableRow key={index} className="hover:bg-gray-50">
+              <TableRow key={index}>
                 <TableCell className="font-mono text-sm break-all max-w-[300px]">
                   {result.smiles}
+                  {!result.error && result.smiles && (
+                    <div className="mt-2">
+                      <MoleculeViewer smiles={result.smiles} width={150} height={100} />
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   {result.error ? (
@@ -65,13 +136,13 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                   )}
                 </TableCell>
                 <TableCell className="font-semibold">
-                  {result.error ? '—' : `${(result.confidence * 100).toFixed(1)}%`}
+                  {result.error ? '—' : `${(result.permeantProbability * 100).toFixed(1)}%`}
                 </TableCell>
                 <TableCell>
                   {result.error ? '—' : (
                     <div className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span>Confidence</span>
+                        <span>Overall Confidence</span>
                         <span className="font-medium">{(result.confidence * 100).toFixed(1)}%</span>
                       </div>
                       <Progress 
@@ -81,8 +152,20 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
                     </div>
                   )}
                 </TableCell>
+                <TableCell className="max-w-[150px]">
+                  {!result.error && result.featuresSummary && result.featuresSummary.length > 0 ? (
+                    <div 
+                      className="relative h-[100px] w-full cursor-pointer" 
+                      onClick={() => handleChartClick(result)}
+                    >
+                      <Bar data={getChartData(result.featuresSummary)} options={chartOptions} />
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 text-xs">No summary features</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-red-600">
-                  {result.error || '—'}
+                  {result.error || 'Success'}
                 </TableCell>
               </TableRow>
             ))}
@@ -119,6 +202,14 @@ const PredictionResults = ({ results }: PredictionResultsProps) => {
           </div>
         </div>
       )}
+
+      <ChartModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        chartData={modalChartData}
+        chartOptions={chartOptions}
+        title={modalChartTitle}
+      />
     </div>
   );
 };

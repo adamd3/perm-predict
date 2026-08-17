@@ -14,16 +14,29 @@ import type { PredictionResult, JobStatus, JobResult } from '@/lib/types'
 
 interface PredictionFormProps {
   initialSmiles?: string;
+  onResultsLoaded?: (hasResults: boolean) => void;
 }
 
-const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
+const PredictionForm = ({ initialSmiles = '', onResultsLoaded }: PredictionFormProps) => {
   const [smilesInput, setSmilesInput] = useState(initialSmiles);
   const [batchInput, setBatchInput] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+      setBatchInput(''); // Clear textarea if file is selected
+    } else {
+      setSelectedFile(null);
+    }
+  };
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState('');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'error' | 'submitted'>('idle');
   const [progress, setProgress] = useState(0);
+
+  const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
 
   // GraphQL hooks
   const [submitPredictionJobMutation] = useMutation(SUBMIT_PREDICTION_JOB);
@@ -32,6 +45,13 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     errorPolicy: 'all',
   });
   const [getPredictionResult, { data: predictionResultData }] = useLazyQuery(GET_PREDICTION_RESULT);
+
+  useEffect(() => {
+    if (initialSmiles && initialSmiles !== smilesInput && !isProcessing) {
+      setSmilesInput(initialSmiles);
+      handleSinglePrediction(initialSmiles);
+    }
+  }, [initialSmiles, isProcessing]);
 
   useEffect(() => {
     if (currentJobId) {
@@ -77,8 +97,15 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
       const result = predictionResultData.getPredictionResult as JobResult;
       console.log("Received predictionResultData:", result);
       if (result.results) {
-        setResults(result.results);
-        console.log("Updated results state with:", result.results);
+        const processedResults = result.results.map(pr => ({
+          ...pr,
+          permeantProbability: pr.classProbabilities && pr.classProbabilities.length > 1 ? pr.classProbabilities[1] : 0,
+        }));
+        setResults(processedResults);
+        console.log("Updated results state with:", processedResults);
+        if (onResultsLoaded) {
+          onResultsLoaded(processedResults.length > 0);
+        }
       }
       // Reset after a delay
       setTimeout(() => {
@@ -87,20 +114,22 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
         setProgress(0);
       }, 2000);
     }
-  }, [predictionResultData]);
+  }, [predictionResultData, onResultsLoaded]);
 
-  const handleSinglePrediction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setResults([]);
-    setProgress(0);
-    
-    try {
-      const { data } = await submitPredictionJobMutation({
-        variables: { jobInput: { smilesList: [smilesInput], jobName: 'Single Prediction' } }
-      });
+    const handleSinglePrediction = async (smilesToPredict: string, e?: React.FormEvent) => {
+      e?.preventDefault();
+      setError('');
+      setResults([]);
+      setProgress(0);
+      if (onResultsLoaded) {
+        onResultsLoaded(false);
+      }
       
-      if (data?.submitPredictionJob) {
+      try {
+        const mutationVariables = { jobInput: { smilesList: [smilesToPredict], jobName: 'Single Prediction' } };
+        const { data } = await submitPredictionJobMutation({
+          variables: mutationVariables
+        });      if (data?.submitPredictionJob) {
                     const jobResponse = data.submitPredictionJob as JobStatus;
         console.log("Job Response:", jobResponse);
         setCurrentJobId(jobResponse.jobId);
@@ -114,23 +143,36 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
 
   const handleBatchPrediction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchInput.trim()) {
-      setError('Please enter SMILES strings');
-      return;
-    }
-
     setError('');
     setResults([]);
     setProgress(0);
-    
-    // Parse SMILES strings (one per line or comma-separated)
-    const smilesStrings = batchInput
-      .split(/[\n,]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-      
+    if (onResultsLoaded) {
+      onResultsLoaded(false);
+    }
+
+    let smilesStrings: string[] = [];
+
+    if (selectedFile) {
+      try {
+        const fileContent = await readFileContent(selectedFile);
+        smilesStrings = fileContent
+          .split(/\r?\n/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      } catch (readError) {
+        setError(`Failed to read file: ${readError instanceof Error ? readError.message : String(readError)}`);
+        setJobStatus('idle');
+        return;
+      }
+    } else if (batchInput.trim()) {
+      smilesStrings = batchInput
+        .split(/[\n,]/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+    }
+
     if (smilesStrings.length === 0) {
-      setError('No valid SMILES strings found');
+      setError('No valid SMILES strings found. Please enter them manually or upload a file.');
       return;
     }
 
@@ -150,6 +192,23 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
       setError('Failed to submit batch prediction. Please try again.');
       setJobStatus('idle');
     }
+  };
+
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && typeof event.target.result === 'string') {
+          resolve(event.target.result);
+        } else {
+          reject(new Error('Failed to read file content.'));
+        }
+      };
+      reader.onerror = (event) => {
+        reject(event.target?.error || new Error('Error reading file.'));
+      };
+      reader.readAsText(file);
+    });
   };
 
   const getStatusIcon = () => {
@@ -181,29 +240,17 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
     }
   };
 
-  const isProcessing = jobStatus === 'pending' || jobStatus === 'processing';
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Chemical Permeability Prediction
-            {getStatusIcon()}
-          </CardTitle>
-          <CardDescription>
-            Enter SMILES notation to predict compound permeability using machine learning
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="single" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="single">Single Prediction</TabsTrigger>
-              <TabsTrigger value="batch">Batch Prediction</TabsTrigger>
-            </TabsList>
+    <>
+      <Tabs defaultValue="single" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="single">Single Prediction</TabsTrigger>
+          <TabsTrigger value="batch">Batch Prediction</TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="single" className="space-y-4">
-              <form onSubmit={handleSinglePrediction} className="space-y-4">
+            <TabsContent value="single" className="space-y-4 mt-4">
+              <form onSubmit={(e) => handleSinglePrediction(smilesInput.trim(), e)} className="space-y-4">
                 <div>
                   <Input
                     placeholder="Enter SMILES string (e.g., CCO for ethanol)..."
@@ -226,56 +273,81 @@ const PredictionForm = ({ initialSmiles = '' }: PredictionFormProps) => {
               </form>
             </TabsContent>
 
-            <TabsContent value="batch" className="space-y-4">
+            <TabsContent value="batch" className="space-y-4 mt-4">
               <form onSubmit={handleBatchPrediction} className="space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <label htmlFor="smiles-file" className="text-sm font-medium leading-none">Upload SMILES File (one per line)</label>
+                  <div className="flex w-full items-center space-x-2">
+                    <Input
+                      id="smiles-file"
+                      type="file"
+                      accept=".txt,.smi,.csv"
+                      onChange={handleFileChange}
+                      className="w-full"
+                      disabled={isProcessing}
+                    />
+                    {selectedFile && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSelectedFile(null)}
+                        disabled={isProcessing}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">Or enter manually below:</span>
+                </div>
                 <div>
                   <textarea
                     placeholder="Enter multiple SMILES strings (one per line or comma-separated)..."
                     value={batchInput}
-                    onChange={(e) => setBatchInput(e.target.value)}
-                    className="w-full min-h-[120px] p-3 border border-gray-300 rounded-md font-mono text-sm resize-vertical focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={isProcessing}
+                    onChange={(e) => {
+                      setBatchInput(e.target.value);
+                      setSelectedFile(null); // Clear selected file if user starts typing
+                    }}
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono resize-vertical"
+                    disabled={isProcessing || selectedFile !== null}
                   />
                 </div>
-                <Button type="submit" disabled={isProcessing || !batchInput.trim()} className="w-full">
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing Batch...
-                    </>
-                  ) : (
-                    'Predict Batch'
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+            <Button type="submit" disabled={isProcessing || (!batchInput.trim() && !selectedFile)} className="w-full">
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing Batch...
+                </>
+              ) : (
+                'Predict Batch'
+              )}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
 
-          {/* Progress indicator */}
-          {isProcessing && (
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  {getStatusIcon()}
-                  {getStatusText()}
-                </span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="w-full" />
-            </div>
-          )}
+      {/* Progress indicator */}
+      {isProcessing && (
+        <div className="mt-6 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 text-white">
+              {getStatusIcon()}
+              {getStatusText()}
+            </span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <Progress value={progress} className="w-full" />
+        </div>
+      )}
 
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      {error && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-          {results.length > 0 && <PredictionResults results={results} />}
-        </CardContent>
-      </Card>
-    </div>
+      {results.length > 0 && <PredictionResults results={results} />}
+    </>
   );
 };
 

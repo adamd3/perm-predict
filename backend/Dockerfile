@@ -7,7 +7,7 @@ WORKDIR /tmp/alvadesc_build
 
 # Create mamba environment and install dependencies
 COPY alvaDescCLIWrapper ./alvaDescCLIWrapper
-RUN micromamba create -n alvadesc python=3.8 openjdk=11 -c conda-forge -c bioconda -c defaults && \
+RUN micromamba create -n alvadesc python=3.8 openjdk=11 rdkit -c conda-forge -c bioconda -c defaults && \
     micromamba run -n alvadesc bash -c " \
     cp -R alvaDescCLIWrapper/alvadesccliwrapper /opt/conda/envs/alvadesc/lib/python3.8/site-packages/ \
     " && \
@@ -26,18 +26,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy alvaDescCLI executable from the build context (project root)
-COPY alvaDescCLI_linux /app/backend/app/ml_models/alvaDescCLI
+# Create a non-root user and switch to it
+RUN adduser --system --group appuser
+USER appuser
+
+# Temporarily switch back to root to change ownership of /app
+USER root
+RUN chown -R appuser:appuser /app
+RUN python -m venv /app/venv
+RUN chown -R appuser:appuser /app/venv
+USER appuser
+
+
+
+# Create a temporary directory for venv/pip operations
+RUN mkdir -p /app/tmp
+
+
+
 
 # Copy alvadesccliwrapper package from mamba_builder stage
 # This assumes alvadesccliwrapper is installed in site-packages
 # We need to find the exact path in the mamba environment
 # For now, let's assume a common path, but this might need adjustment
-COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper /usr/local/lib/python3.8/site-packages/alvadesccliwrapper
-COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper-*.egg-info /usr/local/lib/python3.8/site-packages/
+COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper /app/venv/lib/python3.8/site-packages/alvadesccliwrapper
+COPY --from=mamba_builder /opt/conda/envs/alvadesc/lib/python3.8/site-packages/alvadesccliwrapper-*.egg-info /app/venv/lib/python3.8/site-packages/
 
 COPY ./backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies into the virtual environment
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY ./backend/app ./app
 
@@ -45,10 +62,11 @@ COPY ./backend/app/ml_models/model_mtb.json ./app/ml_models/model_mtb.json
 COPY alvadesc_descriptor_names.json /app/alvadesc_descriptor_names.json
 COPY full_feature_names.json /app/full_feature_names.json
 COPY desc_smiles.tsv /app/desc_smiles.tsv
+COPY alvaDesc_license.alic /app/alvaDesc_license.alic
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="Ketcher is a web-based chemical structure editor"/><link rel="shortcut icon" type="image/x-icon" href="./favicon.ico"/><link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png"/><link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png"/><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png"/><link rel="manifest" href="./manifest.json"/><title>Ketcher v3.7.0</title><script defer="defer" src="./static/js/main.8617f334.js"></script><link href="./static/css/main.748bd42d.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div><script>
+    function initializeKetcherCommunication() {
+        if (window.ketcher) {
+            // Ketcher is ready, post message to parent
+            window.parent.postMessage({ type: 'KETCHER_READY' }, window.location.origin);
+
+            // Listen for messages from the parent window
+            window.addEventListener('message', (event) => {
+                // Ensure the message is from the expected origin
+                if (event.origin !== window.location.origin) {
+                    console.warn('Received message from unknown origin:', event.origin);
+                    return;
+                }
+
+                if (event.data && typeof event.data === 'object' && event.data.type === 'GET_SMILES') {
+                    if (window.ketcher) {
+                        window.ketcher.getSmiles().then((smiles) => {
+                            window.parent.postMessage({ type: 'SMILES_RESULT', smiles }, window.location.origin);
+                        }).catch((error) => {
+                            console.error('Error getting SMILES from Ketcher:', error);
+                            window.parent.postMessage({ type: 'ERROR', message: error.message }, window.location.origin);
+                        });
+                    } else {
+                        console.error('Ketcher object not found in iframe (after KETCHER_READY).');
+                        window.parent.postMessage({ type: 'ERROR', message: 'Ketcher object not found after ready.' }, window.location.origin);
+                    }
+                }
+            });
+        } else {
+            // Ketcher not ready yet, try again after a short delay
+            setTimeout(initializeKetcherCommunication, 100);
+        }
+    }
+
+    window.addEventListener('load', initializeKetcherCommunication);
+</script></body></html>

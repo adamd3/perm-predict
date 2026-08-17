@@ -16,16 +16,23 @@ export interface PredictionFeatures {
   alvadescFeatureVector?: number[];
 }
 
+export interface FeatureSummaryItem {
+  name: string;
+  value: number;
+}
+
 export interface PredictionResult {
   smiles: string;
   prediction: number; // Predicted permeability value (float from backend, but we'll display binary)
   confidence: number; // Model confidence score
+  permeantProbability: number; // Probability of being permeant (prob_1)
   uncertainty?: number; // Prediction uncertainty from ensemble variance
   ensembleStd?: number; // Standard deviation of ensemble predictions
   classifierPrediction: number; // Binary classifier prediction (0 or 1)
   ensemblePredictions?: number[]; // Individual ensemble model predictions
   classProbabilities: number[]; // Probabilities for each class [prob_0, prob_1]
   features?: PredictionFeatures; // Extracted molecular features
+  featuresSummary?: FeatureSummaryItem[]; // Summary of key molecular features
   error?: string; // Error message if prediction failed
 }
 

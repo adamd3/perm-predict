@@ -11,47 +11,69 @@ from app.models import (
     PredictionResult as PredictionResultModel,
     JobResult as JobResultModel,
     JobStatus as JobStatusModel,
-    PredictionJobInput as PredictionJobInputModel
+    PredictionJobInput as PredictionJobInputModel,
+    FeatureSummaryItem as FeatureSummaryItemModel,  # Import the Pydantic model
 )
+
 
 @pydantic.type(model=MolecularDescriptorsModel, all_fields=True)
 class MolecularDescriptors:
     pass
 
+
 @pydantic.type(model=PredictionFeaturesModel, all_fields=True)
 class PredictionFeatures:
     pass
 
-@pydantic.type(model=PredictionResultModel, all_fields=True)
+
+# Define a custom Strawberry type for the features_summary dictionary
+@strawberry.type
+class FeatureSummaryItem:
+    name: str
+    value: float
+
+
+@pydantic.type(model=PredictionResultModel)
 class PredictionResult:
-    pass
+    smiles: str
+    prediction: float
+    confidence: float
+    permeant_probability: float  # Added
+    class_probabilities: List[float]  # Added
+    uncertainty: Optional[float]
+    ensemble_std: Optional[float]
+    classifier_prediction: int
+    ensemble_predictions: Optional[List[float]]
+    features: Optional[PredictionFeatures]
+    features_summary: Optional[List[FeatureSummaryItem]]
+    error: Optional[str]
+
 
 @pydantic.type(model=JobResultModel, all_fields=True)
 class JobResult:
     pass
 
+
 @pydantic.type(model=JobStatusModel, all_fields=True)
 class JobStatus:
     pass
+
 
 @pydantic.input(model=PredictionJobInputModel, all_fields=True)
 class PredictionJobInput:
     pass
 
+
 def convert_features_to_model(features_dict: Dict[str, Any]) -> Optional[PredictionFeaturesModel]:
     """Convert dictionary features to Pydantic model."""
     if not features_dict:
         return None
-    
+
     # Assuming features_dict['descriptors'] is now a list of floats
-    descriptors = MolecularDescriptorsModel(
-        alvadesc_features=features_dict['descriptors']['alvadesc_features']
-    )
-    
-    return PredictionFeaturesModel(
-        morgan_fingerprint=features_dict['morgan_fingerprint'],
-        descriptors=descriptors
-    )
+    descriptors = MolecularDescriptorsModel(alvadesc_features=features_dict["descriptors"]["alvadesc_features"])
+
+    return PredictionFeaturesModel(morgan_fingerprint=features_dict["morgan_fingerprint"], descriptors=descriptors)
+
 
 @strawberry.type
 class Query:
@@ -61,165 +83,302 @@ class Query:
         try:
             # Get task result from Celery
             task = celery_app.AsyncResult(job_id)
-            
+
             if not task:
                 return None
-            
+
             # Only return JobResult for successfully completed tasks
-            if task.state == 'SUCCESS':
+            if task.state == "SUCCESS":
                 result = task.result
-                
+
                 # Convert results to Pydantic models
                 prediction_results = []
-                for r in result.get('results', []):
-                    features = convert_features_to_model(r.get('features'))
+                for r in result.get("results", []):
+                    features = convert_features_to_model(r.get("features"))
+
+                    # features_summary is already a list of FeatureSummaryItem from the worker
+                    features_summary_list = r.get("features_summary", [])
+
                     prediction_results.append(
                         PredictionResultModel(
-                            smiles=r['smiles'],
-                            prediction=r['prediction'],
-                            confidence=r['confidence'],
-                            classifier_prediction=r['classifier_prediction'],
+                            smiles=r["smiles"],
+                            prediction=r["prediction"],
+                            confidence=r["confidence"],
+                            permeant_probability=r["class_probabilities"][1],  # Pass permeant probability
+                            class_probabilities=r["class_probabilities"],  # Pass class probabilities
+                            classifier_prediction=r["classifier_prediction"],
                             features=features,
-                            error=r.get('error')
+                            features_summary=features_summary_list,  # Assign the converted list
+                            error=r.get("error"),
                         )
                     )
-                
+
                 return JobResultModel(
-                    status='completed',
+                    status="completed",
                     results=prediction_results,
-                    total_processed=result.get('total_processed', 0),
-                    successful=result.get('successful', 0),
-                    failed=result.get('failed', 0),
+                    total_processed=result.get("total_processed", 0),
+                    successful=result.get("successful", 0),
+                    failed=result.get("failed", 0),
                     job_id=job_id,
-                    created_at=result.get('created_at', datetime.now().isoformat()),
-                    completed_at=result.get('completed_at', datetime.now().isoformat())
+                    created_at=result.get("created_at", datetime.now().isoformat()),
+                    completed_at=result.get("completed_at", datetime.now().isoformat()),
                 )
-            
+
             # For any other state (PENDING, PROGRESS, FAILURE), return None
             # Clients should use get_job_status to check status
             return None
-                
+
         except Exception as e:
             # Log the error but return None to maintain consistent return type
             logger.error(f"Failed to retrieve job result for {job_id}: {str(e)}")
             return None
-    
+
+    @strawberry.field
+    def get_exploration_result(self, job_id: str) -> Optional[JobResult]:
+        """Get the result of an exploration job by job ID. Only returns results for completed jobs."""
+        try:
+            task = celery_app.AsyncResult(job_id)
+
+            if not task:
+                return None
+
+            if task.state == "SUCCESS":
+                result = task.result
+
+                prediction_results = []
+                for r in result.get("results", []):
+                    features = convert_features_to_model(r.get("features"))
+                    features_summary_list = r.get("features_summary", [])
+
+                    prediction_results.append(
+                        PredictionResultModel(
+                            smiles=r["smiles"],
+                            prediction=r["prediction"],
+                            confidence=r["confidence"],
+                            permeant_probability=r["class_probabilities"][1],  # Pass permeant probability
+                            class_probabilities=r["class_probabilities"],  # Pass class probabilities
+                            classifier_prediction=r["classifier_prediction"],
+                            features=features,
+                            features_summary=features_summary_list,
+                            error=r.get("error"),
+                        )
+                    )
+                return JobResultModel(
+                    status="completed",
+                    results=prediction_results,
+                    total_processed=result.get("total_processed", 0),
+                    successful=result.get("successful", 0),
+                    failed=result.get("failed", 0),
+                    job_id=job_id,
+                    created_at=result.get("created_at", datetime.now().isoformat()),
+                    completed_at=result.get("completed_at", datetime.now().isoformat()),
+                )
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve exploration job result for {job_id}: {str(e)}")
+            return None
+
+    @strawberry.field
+    def get_job_status(self, job_id: str) -> Optional[JobStatus]:
+        """Get the result of a prediction job by job ID. Only returns results for completed jobs."""
+        try:
+            # Get task result from Celery
+            task = celery_app.AsyncResult(job_id)
+
+            if not task:
+                return None
+
+            # Only return JobResult for successfully completed tasks
+            if task.state == "SUCCESS":
+                result = task.result
+
+                # Convert results to Pydantic models
+                prediction_results = []
+                for r in result.get("results", []):
+                    features = convert_features_to_model(r.get("features"))
+
+                    # features_summary is already a list of FeatureSummaryItem from the worker
+                    features_summary_list = r.get("features_summary", [])
+
+                    prediction_results.append(
+                        PredictionResultModel(
+                            smiles=r["smiles"],
+                            prediction=r["prediction"],
+                            confidence=r["confidence"],
+                            permeant_probability=r["class_probabilities"][1],  # Pass permeant probability
+                            class_probabilities=r["class_probabilities"],  # Pass class probabilities
+                            classifier_prediction=r["classifier_prediction"],
+                            features=features,
+                            features_summary=features_summary_list,  # Assign the converted list
+                            error=r.get("error"),
+                        )
+                    )
+                return JobResultModel(
+                    status="completed",
+                    results=prediction_results,
+                    total_processed=result.get("total_processed", 0),
+                    successful=result.get("successful", 0),
+                    failed=result.get("failed", 0),
+                    job_id=job_id,
+                    created_at=result.get("created_at", datetime.now().isoformat()),
+                    completed_at=result.get("completed_at", datetime.now().isoformat()),
+                )
+
+            # For any other state (PENDING, PROGRESS, FAILURE), return None
+            # Clients should use get_job_status to check status
+            return None
+
+        except Exception as e:
+            # Log the error but return None to maintain consistent return type
+            logger.error(f"Failed to retrieve job result for {job_id}: {str(e)}")
+            return None
+
     @strawberry.field
     def get_job_status(self, job_id: str) -> Optional[JobStatus]:
         """Get the current status of a prediction job."""
         try:
             task = celery_app.AsyncResult(job_id)
-            
+
             if not task:
                 return None
-            
+
             # Retrieve job metadata from Redis
             try:
                 metadata = celery_app.backend.get(f"job_metadata:{job_id}")
                 if metadata:
-                    metadata = json.loads(metadata) # Manually deserialize from JSON string
-                created_at = metadata.get('created_at') if metadata else datetime.now().isoformat()
+                    metadata = json.loads(metadata)  # Manually deserialize from JSON string
+                created_at = metadata.get("created_at") if metadata else datetime.now().isoformat()
             except:
                 created_at = datetime.now().isoformat()
-            
+
             status_map = {
-                'PENDING': 'pending',
-                'PROGRESS': 'processing',
-                'SUCCESS': 'completed',
-                'FAILURE': 'failed',
-                'RETRY': 'retrying',
-                'REVOKED': 'cancelled'
+                "PENDING": "pending",
+                "PROGRESS": "processing",
+                "SUCCESS": "completed",
+                "FAILURE": "failed",
+                "RETRY": "retrying",
+                "REVOKED": "cancelled",
             }
-            
+
             # Generate appropriate progress message
-            if task.state == 'PENDING':
+            if task.state == "PENDING":
                 progress = "Job is queued and waiting to be processed"
-            elif task.state == 'PROGRESS':
+            elif task.state == "PROGRESS":
                 progress = "Job is currently being processed"
-            elif task.state == 'SUCCESS':
+            elif task.state == "SUCCESS":
                 progress = "Job completed successfully"
-            elif task.state == 'FAILURE':
+            elif task.state == "FAILURE":
                 progress = "Job failed during processing"
             else:
                 progress = f"Task state: {task.state}"
-            
+
             return JobStatusModel(
                 job_id=job_id,
-                status=status_map.get(task.state, 'unknown'),
+                status=status_map.get(task.state, "unknown"),
                 created_at=created_at,
                 progress=progress,
-                error=str(task.info) if task.state == 'FAILURE' and task.info else None
+                error=str(task.info) if task.state == "FAILURE" and task.info else None,
             )
-            
+
         except Exception as e:
             return JobStatusModel(
                 job_id=job_id,
-                status='error',
+                status="error",
                 created_at=datetime.now().isoformat(),
-                error=f"Failed to get job status: {str(e)}"
+                error=f"Failed to get job status: {str(e)}",
             )
+
 
 from app.utils.logger import logger
 
 import json
 
+from fastapi_limiter.depends import RateLimiter  # Import RateLimiter (limiter)
+
+
 @strawberry.type
 class Mutation:
     @strawberry.field
     def submit_prediction_job(self, job_input: PredictionJobInput) -> JobStatus:
-
         """Submit a new prediction job and return the job ID."""
         try:
             # Validate input
             if not job_input.smiles_list:
                 return JobStatusModel(
                     job_id="",
-                    status='error',
+                    status="error",
                     created_at=datetime.now().isoformat(),
-                    error="SMILES list cannot be empty"
+                    error="SMILES list cannot be empty",
                 )
-            
+
             # Capture creation timestamp
             created_at = datetime.now().isoformat()
-            
+
             # Submit job to Celery with metadata
             task = celery_app.send_task(
-                'predict_permeability',
-                args=[job_input.smiles_list],
-                kwargs={
-                    'created_at': created_at,
-                    'job_name': job_input.job_name
-                }
+                "predict_permeability",
+                args=(job_input.smiles_list,),
+                kwargs={"created_at": created_at, "job_name": job_input.job_name},
             )
 
-            
             # Store job metadata in Redis for timestamp tracking
             metadata_to_store = {
-                'created_at': created_at,
-                'job_name': job_input.job_name,
-                'smiles_count': len(job_input.smiles_list)
+                "created_at": created_at,
+                "job_name": job_input.job_name,
+                "smiles_count": len(job_input.smiles_list),
             }
             celery_app.backend.set(
-                f"job_metadata:{task.id}",
-                json.dumps(metadata_to_store) # Manually serialize to JSON string
-            )
-            
-            return JobStatusModel(
-                job_id=task.id,
-                status='submitted',
-                created_at=created_at,
-                progress=f"Job submitted with {len(job_input.smiles_list)} compounds"
-            )
-            
-        except Exception as e:
-            return JobStatusModel(
-                job_id="",
-                status='error',
-                created_at=datetime.now().isoformat(),
-                error=str(e)
+                f"job_metadata:{task.id}", json.dumps(metadata_to_store)  # Manually serialize to JSON string
             )
 
-schema = strawberry.Schema(
-    query=Query,
-    mutation=Mutation
-)
+            return JobStatusModel(
+                job_id=task.id,
+                status="submitted",
+                created_at=created_at,
+                progress=f"Job submitted with {len(job_input.smiles_list)} compounds",
+            )
+
+        except Exception as e:
+            return JobStatusModel(job_id="", status="error", created_at=datetime.now().isoformat(), error=str(e))
+
+    @strawberry.field
+    def submit_exploration_job(self, job_input: PredictionJobInput) -> JobStatus:
+        """Submit a new exploration job and return the job ID."""
+        try:
+            if not job_input.smiles_list or len(job_input.smiles_list) != 1:
+                return JobStatusModel(
+                    job_id="",
+                    status="error",
+                    created_at=datetime.now().isoformat(),
+                    error="Exploration requires exactly one SMILES string.",
+                )
+
+            created_at = datetime.now().isoformat()
+
+            task = celery_app.send_task(
+                "explore_permeability",
+                args=[job_input.smiles_list[0]],  # Pass single SMILES string
+                kwargs={"created_at": created_at, "job_name": job_input.job_name},
+            )
+
+            metadata_to_store = {
+                "created_at": created_at,
+                "job_name": job_input.job_name,
+                "smiles_count": 1,  # Always 1 for exploration
+            }
+            celery_app.backend.set(f"job_metadata:{task.id}", json.dumps(metadata_to_store))
+
+            return JobStatusModel(
+                job_id=task.id,
+                status="submitted",
+                created_at=created_at,
+                progress=f"Exploration job submitted for {job_input.smiles_list[0]}",
+            )
+
+        except Exception as e:
+            return JobStatusModel(job_id="", status="error", created_at=datetime.now().isoformat(), error=str(e))
+
+
+schema = strawberry.Schema(query=Query, mutation=Mutation)
