@@ -7,24 +7,24 @@
 [![Celery](https://img.shields.io/badge/Celery-Distributed_Tasks-37814A.svg)](https://docs.celeryq.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 
-A full-stack, distributed web platform for AI-driven prediction of chemical accumulation and drug permeability in bacterial pathogens[cite: 1]. **Perm-Predict** ingests small-molecule chemical representations (SMILES) and executes multi-stage machine-learning inference pipelines to output compound accumulation scores, model confidence intervals, and chemical feature analyses[cite: 1].
+A full-stack, distributed web platform for AI-driven prediction of chemical accumulation and drug permeability in bacterial pathogens. **Perm-Predict** ingests small-molecule chemical representations (SMILES) and executes multi-stage machine-learning inference pipelines to output compound accumulation scores, model confidence intervals, and chemical feature analyses.
 
 ---
 
 ## Overview
 
-Perm-Predict implements a two-stage predictive machine learning architecture designed to evaluate compound permeability in bacterial systems[cite: 1]:
+Perm-Predict implements a two-stage predictive machine learning architecture designed to evaluate compound permeability in bacterial systems:
 
-1. **Stage 1 (Binary Classification):** Evaluates input molecules to filter out compounds exhibiting "near-zero" baseline accumulation[cite: 1].
-2. **Stage 2 (Ensemble Regression):** Compounds passing the initial classification filter are processed through an ensemble regression pipeline (**XGBoost**, **AttentiveFP**, and **DimeNet++**) to predict quantitative permeability rates[cite: 1].
+1. **Stage 1 (Binary Classification):** Evaluates input molecules to filter out compounds exhibiting "near-zero" baseline accumulation.
+2. **Stage 2 (Ensemble Regression):** Compounds passing the initial classification filter are processed through an ensemble regression pipeline (**XGBoost**, **AttentiveFP**, and **DimeNet++**) to predict quantitative permeability rates.
 
-Molecules are dynamically featurized from raw SMILES into learned molecular graph embeddings, classical physicochemical descriptors, and Morgan fingerprints prior to model inference[cite: 1].
+Molecules are dynamically featurized from raw SMILES into learned molecular graph embeddings, classical physicochemical descriptors, and Morgan fingerprints prior to model inference.
 
 ---
 
 ## System Architecture
 
-The application is built on a decoupled, asynchronous microservice architecture to decouple compute-intensive deep-learning inference from the HTTP presentation and API routing layers[cite: 1].
+The application is built on a decoupled, asynchronous microservice architecture to decouple compute-intensive deep-learning inference from the HTTP presentation and API routing layers.
 
 ```mermaid
 graph TD
@@ -112,18 +112,18 @@ perm-predict/
 ## Component Breakdown
 
 - **Frontend (Next.js / TypeScript / Tailwind CSS):**
-  - Modern dashboard built on the Next.js App Router for interactive chemical input and result analysis[cite: 1].
-  - Real-time polling via a typed GraphQL client to handle asynchronous task updates without freezing the user interface[cite: 1].
-  - Visualizes molecular structures, descriptor distributions, and ensemble confidence metrics[cite: 1].
+  - Modern dashboard built on the Next.js App Router for interactive chemical input and result analysis.
+  - Real-time polling via a typed GraphQL client to handle asynchronous task updates without freezing the user interface.
+  - Visualizes molecular structures, descriptor distributions, and ensemble confidence metrics.
 
 - **Backend & API Gateway (FastAPI / Strawberry GraphQL):**
-  - Asynchronous ASGI web service routing schema queries and task-dispatch mutations[cite: 1].
-  - Enforces strict type checking and validation on all incoming SMILES strings before scheduling compute tasks[cite: 1].
+  - Asynchronous ASGI web service routing schema queries and task-dispatch mutations.
+  - Enforces strict type checking and validation on all incoming SMILES strings before scheduling compute tasks.
 
 - **Distributed Compute Engine (Celery / Redis):**
-  - Celery handles parallel task execution across dedicated worker containers[cite: 1].
-  - Redis acts as the central message broker and low-latency result cache[cite: 1].
-  - Models run in dedicated worker processes to ensure isolation between inference compute and API throughput[cite: 1].
+  - Celery handles parallel task execution across dedicated worker containers.
+  - Redis acts as the central message broker and low-latency result cache.
+  - Models run in dedicated worker processes to ensure isolation between inference compute and API throughput.
 
 ---
 
@@ -221,7 +221,7 @@ NEXT_PUBLIC_GRAPHQL_ENDPOINT=http://localhost:8000/graphql
 
 ## GraphQL API Reference
 
-The backend exposes an interactive GraphQL endpoint at `/graphql`[cite: 1].
+The backend exposes an interactive GraphQL endpoint at `/graphql`.
 
 ### Submit Prediction Job
 
@@ -270,7 +270,7 @@ query GetPredictionDetails($jobId: String!) {
 
 ## Testing & Quality Assurance
 
-Run the test suite across unit models, feature processing, and API routes[cite: 1]:
+Run the test suite across unit models, feature processing, and API routes:
 
 ```bash
 cd backend
