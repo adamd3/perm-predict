@@ -5,8 +5,8 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     # Celery Configuration
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
     
     # ML Model Paths
     MODEL_CLASSIFIER_PATH: str = os.getenv("MODEL_CLASSIFIER_PATH", "app/ml_models/model_mtb.json")
